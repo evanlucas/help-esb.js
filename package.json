@@ -1,0 +1,19 @@
+{
+  "name": "help-esb",
+  "version": "0.1.0",
+  "description": "A client for our ESB.",
+  "main": "help-esb.js",
+  "author": "Help.com",
+  "license": "proprietary",
+  "dependencies": {
+    "bluebird": "~2.3"
+  },
+  "devDependencies": {
+    "docco": "~0.6.3",
+    "jshint": "~2.5"
+  },
+  "scripts": {
+    "doc": "docco help-esb.js",
+    "lint": "jshint help-esb.js"
+  }
+}
