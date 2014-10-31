@@ -19,6 +19,7 @@
 
   // ## HelpEsb.Client
 
+  // ### HelpEsb.Client *constructor*
   // The client connects to the ESB running on the given host/port.  You will
   // need to **subscribe** before doing anything over the connection.
   //
@@ -50,6 +51,7 @@
     this._handlers = {};
   };
 
+  // ### HelpEsb.Client.subscribe
   // Register with the ESB and list your desired channel subscriptions.  This
   // returns a [promise](https://github.com/petkaantonov/bluebird) of the send
   // event so you can do additional tasks after the subscription has been sent.
@@ -61,11 +63,12 @@
   //     });
   HelpEsb.Client.prototype.subscribe = function(name, subscriptions) {
     return this._send({
-      meta: {type: 'subscribe'},
+      meta: {type: 'login'},
       data: {name: name, subscriptions: subscriptions}
     });
   };
 
+  // ### HelpEsb.Client.on
   // Register an event handler for the given event.  This may be called
   // multiple times to attach multiple event handlers for the same event or for
   // different ones.  They will be called in the order they are added.  The
@@ -86,6 +89,7 @@
     this._handlers[name].push(cb);
   };
 
+  // ### HelpEsb.Client.send
   // Sends a payload message to the ESB with the given data.  Returns a promise
   // that,, like the `subscribe` call, is fulfilled when the message is sent,
   // but does not indicate whether the message was received by the ESB.
@@ -138,6 +142,11 @@
     } catch (e) {
       this._trigger('error', e);
       return;
+    }
+
+    if (typeof packet.meta !== 'object' || typeof packet.meta.type !== 'string' || typeof packet.data === 'undefined') {
+      this._trigger('error', 'Invalid format detected for packet', packet);
+      return
     }
 
     this._trigger(packet.meta.type, packet.data);
