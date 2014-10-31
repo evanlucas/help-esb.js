@@ -63,7 +63,7 @@
   //     });
   HelpEsb.Client.prototype.subscribe = function(name, subscriptions) {
     return this._send({
-      meta: {type: 'subscribe'},
+      meta: {type: 'login'},
       data: {name: name, subscriptions: subscriptions}
     });
   };
