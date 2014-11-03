@@ -6,15 +6,15 @@
   // Setup HelpEsb appropriately for the environment.  Dependency on net likely
   // means this only works on Node.js, but meh.
   if (typeof define === 'function' && define.amd) {
-    define(['net', 'bluebird'], function(net, Promise) {
-      root.HelpEsb = factory(exports, net, Promise);
+    define(['net', 'bluebird', 'uuid'], function(net, Promise, uuid) {
+      root.HelpEsb = factory(exports, net, Promise, uuid);
     });
   } else if (typeof exports !== 'undefined') {
-    factory(exports, require('net'), require('bluebird'));
+    factory(exports, require('net'), require('bluebird'), require('uuid'));
   } else {
-    root.HelpEsb = factory({}, root.net, root.Promise);
+    root.HelpEsb = factory({}, root.net, root.Promise, root.uuid);
   }
-}(this, function(HelpEsb, net, Promise) {
+}(this, function(HelpEsb, net, Promise, uuid) {
   'use strict';
 
   // ## HelpEsb.Client
@@ -101,11 +101,11 @@
 
   // ### Private
 
-  // Wait on the socket connection and once it is available, send the JSON
-  // serialized packet.  Each message must be terminated with a newline.
+  // Wait on the socket connection and once it is available, send the
+  // "massaged" and serialized packet in accordance with ESB requirements.
   HelpEsb.Client.prototype._send = function(packet) {
     return this._socketConnection.then(function() {
-      this._socket.write(JSON.stringify(packet) + '\n');
+      this._socket.write(this._massageOutboundPacket(packet));
     }.bind(this));
   };
 
@@ -146,7 +146,7 @@
 
     if (typeof packet.meta !== 'object' || typeof packet.meta.type !== 'string' || typeof packet.data === 'undefined') {
       this._trigger('error', 'Invalid format detected for packet', packet);
-      return
+      return;
     }
 
     this._trigger(packet.meta.type, packet.data);
@@ -164,6 +164,16 @@
     this._handlers[name].forEach(function(handler) {
       handler.call({}, args);
     });
+  };
+
+  // Process the packet to ensure it conforms to the ESB requirements.  Sets
+  // the message id in the metadata for the packet if it wasn't already set.
+  // JSON encodes the message.  Finally, appends a newline to the message as
+  // the delimiter between messages.
+  HelpEsb.Client.prototype._massageOutboundPacket = function(packet) {
+    packet.meta.id = packet.meta.id || uuid.v4();
+
+    return JSON.stringify(packet) + "\n";
   };
 
   return HelpEsb;
