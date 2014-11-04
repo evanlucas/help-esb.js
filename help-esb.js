@@ -178,5 +178,3 @@
 
   return HelpEsb;
 }));
-
-// [bluebird]: https://github.com/petkaantonov/bluebird
