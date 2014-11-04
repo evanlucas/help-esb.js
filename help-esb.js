@@ -148,7 +148,11 @@
       return;
     }
 
-    if (typeof packet.meta !== 'object' || typeof packet.meta.type !== 'string' || typeof packet.data === 'undefined') {
+    if (
+      typeof packet.meta !== 'object' ||
+      typeof packet.meta.type !== 'string' ||
+      typeof packet.data === 'undefined'
+    ) {
       this._trigger('error', 'Invalid format detected for packet', packet);
       return;
     }
