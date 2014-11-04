@@ -53,15 +53,16 @@
     // We begin with empty handlers.
     this._handlers = {};
 
-    // Start with empty credentials.
+    // Start with empty credentials and no authentication.
     this._credentials = {};
+    this._authentication = null;
   };
 
   // ### HelpEsb.Client.login
   // Set authentication credentials for use with the ESB.  Right now, this does
   // not actually "login" to the ESB because that behavior is combined with the
-  // subscription behavior.  It is still important to subscribe in order to
-  // finalize the login.
+  // subscription behavior.  Once you subscribe or attempt to send a message,
+  // the login will be finalized.
   //
   //     client.login('clientName');
   HelpEsb.Client.prototype.login = function(name) {
@@ -79,13 +80,13 @@
   //       console.log('Subscribed!');
   //     });
   HelpEsb.Client.prototype.subscribe = function(subscription) {
-    return this._send({
+    return this._authentication = this._sendRaw(this._massageOutboundPacket({
       meta: {type: 'login'},
       data: _.extend(
         this._credentials,
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
-    });
+    }));
   };
 
   // ### HelpEsb.Client.on
@@ -126,7 +127,9 @@
 
   // Format the packet for the ESB and send it over the socket.
   HelpEsb.Client.prototype._send = function(packet) {
-    return this._sendRaw(this._massageOutboundPacket(packet));
+    return this._authenticated().then(function() {
+      this._sendRaw(this._massageOutboundPacket(packet));
+    }.bind(this));
   };
 
   // Wait on the socket connection and once it is avaialable send the given
@@ -135,6 +138,12 @@
     return this._socketConnection.then(function() {
       return this._socket.writeAsync(data);
     }.bind(this));
+  };
+
+  // Returns the promise of authentication if the user has already subscribed,
+  // otherwise it just subscribes to nothing in order to at least authenticate.
+  HelpEsb.Client.prototype._authenticated = function() {
+    return this._authentication || this.subscribe();
   };
 
   // Handle an incoming slice of data over the socket.  Split the message on
