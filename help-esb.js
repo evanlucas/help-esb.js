@@ -124,11 +124,16 @@
   // ---
   // ### Private Methods
 
-  // Wait on the socket connection and once it is available, send the
-  // "massaged" and serialized packet in accordance with ESB requirements.
+  // Format the packet for the ESB and send it over the socket.
   HelpEsb.Client.prototype._send = function(packet) {
+    return this._sendRaw(this._massageOutboundPacket(packet));
+  };
+
+  // Wait on the socket connection and once it is avaialable send the given
+  // string data returning a promise of the data being sent.
+  HelpEsb.Client.prototype._sendRaw = function(data) {
     return this._socketConnection.then(function() {
-      return this._socket.writeAsync(this._massageOutboundPacket(packet));
+      return this._socket.writeAsync(data);
     }.bind(this));
   };
 
