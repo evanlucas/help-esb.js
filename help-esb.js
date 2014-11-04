@@ -1,5 +1,3 @@
-//     help-esb.js
-
 (function(root, factory) {
   'use strict';
 
