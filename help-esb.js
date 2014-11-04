@@ -6,25 +6,27 @@
   // Setup HelpEsb appropriately for the environment.  Dependency on net likely
   // means this only works on Node.js, but meh.
   if (typeof define === 'function' && define.amd) {
-    define(['net', 'bluebird', 'uuid'], function(net, Promise, uuid) {
-      root.HelpEsb = factory(exports, net, Promise, uuid);
+    define(['net', 'bluebird', 'uuid', 'lodash'], function(net, Promise, uuid, _) {
+      root.HelpEsb = factory(exports, net, Promise, uuid, _);
     });
   } else if (typeof exports !== 'undefined') {
-    factory(exports, require('net'), require('bluebird'), require('uuid'));
+    factory(exports, require('net'), require('bluebird'), require('uuid'), require('lodash'));
   } else {
-    root.HelpEsb = factory({}, root.net, root.Promise, root.uuid);
+    root.HelpEsb = factory({}, root.net, root.Promise, root.uuid, root._);
   }
-}(this, function(HelpEsb, net, Promise, uuid) {
+}(this, function(HelpEsb, net, Promise, uuid, _) {
   'use strict';
 
   // ## HelpEsb.Client
 
   // ### HelpEsb.Client *constructor*
   // The client connects to the ESB running on the given host/port.  You will
-  // need to **subscribe** before doing anything over the connection.
+  // need to **login** and **subscribe** before doing anything over the
+  // connection.
   //
   //     var client = Esb.Client('example.com', 1234);
-  //     client.subscribe('clientName', ['subscriptionChannel1']);
+  //     client.login('clientName');
+  //     client.subscribe('subscriptionChannel1');
   HelpEsb.Client = function(host, port) {
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
@@ -50,23 +52,41 @@
 
     // We begin with empty handlers.
     this._handlers = {};
+
+    // Start with empty credentials and no authentication.
+    this._credentials = {};
+    this._authentication = null;
   };
 
+  // ### HelpEsb.Client.login
+  // Set authentication credentials for use with the ESB.  Right now, this does
+  // not actually "login" to the ESB because that behavior is combined with the
+  // subscription behavior.  Once you subscribe or attempt to send a message,
+  // the login will be finalized.
+  //
+  //     client.login('clientName');
+  HelpEsb.Client.prototype.login = function(name) {
+    this._credentials.name = name;
+  }
+
   // ### HelpEsb.Client.subscribe
-  // Register with the ESB and list your desired channel subscriptions.  This
-  // returns a [promise](https://github.com/petkaantonov/bluebird) of the send
-  // event so you can do additional tasks after the subscription has been sent.
-  // Note that this currently only checks that the message was sent and so the
+  // Register with the ESB and subscribe to an ESB group.  This returns a
+  // [promise](https://github.com/petkaantonov/bluebird) of the send event so
+  // you can do additional tasks after the subscription has been sent.  Note
+  // that this currently only checks that the message was sent and so the
   // promise does not indicate that the subscription was successful on the ESB.
   //
-  //     client.subscribe('test', ['a', 'b']).then(function() {
+  //     client.subscribe('a').then(function() {
   //       console.log('Subscribed!');
   //     });
-  HelpEsb.Client.prototype.subscribe = function(name, subscriptions) {
-    return this._send({
+  HelpEsb.Client.prototype.subscribe = function(subscription) {
+    return this._authentication = this._sendRaw(this._massageOutboundPacket({
       meta: {type: 'login'},
-      data: {name: name, subscriptions: subscriptions}
-    });
+      data: _.extend(
+        this._credentials,
+        {subscriptions: Array.prototype.slice.call(arguments)}
+      )
+    }));
   };
 
   // ### HelpEsb.Client.on
@@ -105,12 +125,25 @@
   // ---
   // ### Private Methods
 
-  // Wait on the socket connection and once it is available, send the
-  // "massaged" and serialized packet in accordance with ESB requirements.
+  // Format the packet for the ESB and send it over the socket.
   HelpEsb.Client.prototype._send = function(packet) {
-    return this._socketConnection.then(function() {
-      return this._socket.writeAsync(this._massageOutboundPacket(packet));
+    return this._authenticated().then(function() {
+      this._sendRaw(this._massageOutboundPacket(packet));
     }.bind(this));
+  };
+
+  // Wait on the socket connection and once it is avaialable send the given
+  // string data returning a promise of the data being sent.
+  HelpEsb.Client.prototype._sendRaw = function(data) {
+    return this._socketConnection.then(function() {
+      return this._socket.writeAsync(data);
+    }.bind(this));
+  };
+
+  // Returns the promise of authentication if the user has already subscribed,
+  // otherwise it just subscribes to nothing in order to at least authenticate.
+  HelpEsb.Client.prototype._authenticated = function() {
+    return this._authentication || this.subscribe();
   };
 
   // Handle an incoming slice of data over the socket.  Split the message on
