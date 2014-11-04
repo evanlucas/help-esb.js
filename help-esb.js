@@ -126,7 +126,7 @@
   // Format the packet for the ESB and send it over the socket.
   HelpEsb.Client.prototype._send = function(packet) {
     return this._authenticated().then(function() {
-      this._sendRaw(this._massageOutboundPacket(packet));
+      return this._sendRaw(this._massageOutboundPacket(packet));
     }.bind(this));
   };
 
