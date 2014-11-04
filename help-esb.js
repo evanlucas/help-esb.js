@@ -65,7 +65,7 @@
   //     client.login('clientName');
   HelpEsb.Client.prototype.login = function(name) {
     this._credentials.name = name;
-  }
+  };
 
   // ### HelpEsb.Client.subscribe
   // Register with the ESB and subscribe to an ESB group.  This returns a
@@ -77,7 +77,7 @@
   //     client.subscribe('a').then(function() {
   //       console.log('Subscribed!');
   //     });
-  HelpEsb.Client.prototype.subscribe = function(subscription) {
+  HelpEsb.Client.prototype.subscribe = function() {
     return this._authentication = this._sendRaw(this._massageOutboundPacket({
       meta: {type: 'login'},
       data: _.extend(
