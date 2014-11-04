@@ -214,7 +214,7 @@
       }
 
       this._handlers[key][value].forEach(function(handler) {
-        handler.call({}, args);
+        handler.apply({}, args);
       });
     }.bind(this));
   };
