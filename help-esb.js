@@ -28,14 +28,15 @@
   HelpEsb.Client = function(host, port) {
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
-    this._socket = net.createConnection({host: host, port: port});
+    this._socket = Promise.promisifyAll(
+      net.createConnection({host: host, port: port})
+    );
     this._socket.setEncoding('utf-8');
 
     // We can't send anything over the socket until we have a connection.  We
     // immediately initiate the connection and save a promise for it so that
     // the client ensures the connection exists before trying to send data.
-    var promiseOn = Promise.promisify(this._socket.on, this._socket);
-    this._socketConnection = promiseOn('connect');
+    this._socketConnection = this._socket.onAsync('connect');
 
     // Handle data coming in over the socket using our special handler.
     // Because data can come in pieces, we have to keep a data buffer so that
@@ -108,7 +109,7 @@
   // "massaged" and serialized packet in accordance with ESB requirements.
   HelpEsb.Client.prototype._send = function(packet) {
     return this._socketConnection.then(function() {
-      this._socket.write(this._massageOutboundPacket(packet));
+      return this._socket.writeAsync(this._massageOutboundPacket(packet));
     }.bind(this));
   };
 
