@@ -1,7 +1,7 @@
 var HelpEsb = require('../help-esb');
 var client = new HelpEsb.Client(process.env.ESB_HOST, process.env.ESB_PORT);
 client.login('foo');
-client.subscribe(['asdf']);
+client.subscribe('asdf');
 
 client.on('payload', function(data) {
   console.log('Received data:');

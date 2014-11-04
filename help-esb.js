@@ -26,7 +26,7 @@
   //
   //     var client = Esb.Client('example.com', 1234);
   //     client.login('clientName');
-  //     client.subscribe(['subscriptionChannel1']);
+  //     client.subscribe('subscriptionChannel1');
   HelpEsb.Client = function(host, port) {
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
@@ -69,19 +69,22 @@
   }
 
   // ### HelpEsb.Client.subscribe
-  // Register with the ESB and list your desired channel subscriptions.  This
-  // returns a [promise](https://github.com/petkaantonov/bluebird) of the send
-  // event so you can do additional tasks after the subscription has been sent.
-  // Note that this currently only checks that the message was sent and so the
+  // Register with the ESB and subscribe to an ESB group.  This returns a
+  // [promise](https://github.com/petkaantonov/bluebird) of the send event so
+  // you can do additional tasks after the subscription has been sent.  Note
+  // that this currently only checks that the message was sent and so the
   // promise does not indicate that the subscription was successful on the ESB.
   //
-  //     client.subscribe(['a', 'b']).then(function() {
+  //     client.subscribe('a').then(function() {
   //       console.log('Subscribed!');
   //     });
-  HelpEsb.Client.prototype.subscribe = function(subscriptions) {
+  HelpEsb.Client.prototype.subscribe = function(subscription) {
     return this._send({
       meta: {type: 'login'},
-      data: _.extend(this._credentials, {subscriptions: subscriptions})
+      data: _.extend(
+        this._credentials,
+        {subscriptions: Array.prototype.slice.call(arguments)}
+      )
     });
   };
 
