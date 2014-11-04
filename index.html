@@ -107,7 +107,9 @@ here as we shouldn’t really use anything else.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._socket = net.createConnection({host: host, port: port});
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._socket = Promise.promisifyAll(
+      net.createConnection({host: host, port: port})
+    );
     <span class="hljs-keyword">this</span>._socket.setEncoding(<span class="hljs-string">'utf-8'</span>);</pre></div></div>
             
         </li>
@@ -125,8 +127,7 @@ the client ensures the connection exists before trying to send data.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">var</span> promiseOn = Promise.promisify(<span class="hljs-keyword">this</span>._socket.on, <span class="hljs-keyword">this</span>._socket);
-    <span class="hljs-keyword">this</span>._socketConnection = promiseOn(<span class="hljs-string">'connect'</span>);</pre></div></div>
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._socketConnection = <span class="hljs-keyword">this</span>._socket.onAsync(<span class="hljs-string">'connect'</span>);</pre></div></div>
             
         </li>
         
@@ -264,12 +265,14 @@ client.on(<span class="hljs-string">'error'</span>, <span class="hljs-function">
 <p>Sends a payload message to the ESB with the given data.  Returns a promise
 that,, like the <code>subscribe</code> call, is fulfilled when the message is sent,
 but does not indicate whether the message was received by the ESB.</p>
-<pre><code>client.send({id: <span class="hljs-number">1234</span>, message: <span class="hljs-string">'Hello!'</span>});
+<pre><code>client.send(<span class="hljs-string">'target'</span>, {id: <span class="hljs-number">1234</span>, message: <span class="hljs-string">'Hello!'</span>});
 </code></pre>
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send({meta: {type: <span class="hljs-string">'payload'</span>}, data: data});
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, data)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
+      {meta: {type: <span class="hljs-string">'sendMessage'</span>}, data: {group: group, message: data}}
+    );
   };</pre></div></div>
             
         </li>
@@ -281,7 +284,7 @@ but does not indicate whether the message was received by the ESB.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-14">&#182;</a>
               </div>
-              <h3 id="private">Private</h3>
+              <hr>
 
             </div>
             
@@ -294,16 +297,9 @@ but does not indicate whether the message was received by the ESB.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-15">&#182;</a>
               </div>
-              <p>Wait on the socket connection and once it is available, send the
-“massaged” and serialized packet in accordance with ESB requirements.</p>
+              <h3 id="private-methods">Private Methods</h3>
 
             </div>
-            
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socketConnection.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-      <span class="hljs-keyword">this</span>._socket.write(<span class="hljs-keyword">this</span>._massageOutboundPacket(packet));
-    }.bind(<span class="hljs-keyword">this</span>));
-  };</pre></div></div>
             
         </li>
         
@@ -313,6 +309,26 @@ but does not indicate whether the message was received by the ESB.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>Wait on the socket connection and once it is available, send the
+“massaged” and serialized packet in accordance with ESB requirements.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socketConnection.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socket.writeAsync(<span class="hljs-keyword">this</span>._massageOutboundPacket(packet));
+    }.bind(<span class="hljs-keyword">this</span>));
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
               </div>
               <p>Handle an incoming slice of data over the socket.  Split the message on
 the newline delimiters and pass each complete packet to <code>_handlePacket</code>.</p>
@@ -324,11 +340,11 @@ the newline delimiters and pass each complete packet to <code>_handlePacket</cod
         </li>
         
         
-        <li id="section-17">
+        <li id="section-18">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-17">&#182;</a>
+                <a class="pilcrow" href="#section-18">&#182;</a>
               </div>
               <p>Continue to append to the buffer.  The full message may not come in one
 piece.</p>
@@ -341,11 +357,11 @@ piece.</p>
         </li>
         
         
-        <li id="section-18">
+        <li id="section-19">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-18">&#182;</a>
+                <a class="pilcrow" href="#section-19">&#182;</a>
               </div>
               <p>It is even possible that multiple packets were sent at once and so we
 need to make sure we parse all of them.</p>
@@ -357,11 +373,11 @@ need to make sure we parse all of them.</p>
         </li>
         
         
-        <li id="section-19">
+        <li id="section-20">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-19">&#182;</a>
+                <a class="pilcrow" href="#section-20">&#182;</a>
               </div>
               <p>The section after the last newline (which may be empty) is kept in the
 buffer as it belongs to the next packet.</p>
@@ -377,11 +393,11 @@ buffer as it belongs to the next packet.</p>
         </li>
         
         
-        <li id="section-20">
+        <li id="section-21">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-20">&#182;</a>
+                <a class="pilcrow" href="#section-21">&#182;</a>
               </div>
               <p>Handles a single packet of data.  The data is expected to be JSON, and if
 it isn’t, an error will be triggered through the event handler.
@@ -401,7 +417,11 @@ payload packets.</p>
       <span class="hljs-keyword">return</span>;
     }
 
-    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> packet.meta !== <span class="hljs-string">'object'</span> || <span class="hljs-keyword">typeof</span> packet.meta.type !== <span class="hljs-string">'string'</span> || <span class="hljs-keyword">typeof</span> packet.data === <span class="hljs-string">'undefined'</span>) {
+    <span class="hljs-keyword">if</span> (
+      <span class="hljs-keyword">typeof</span> packet.meta !== <span class="hljs-string">'object'</span> ||
+      <span class="hljs-keyword">typeof</span> packet.meta.type !== <span class="hljs-string">'string'</span> ||
+      <span class="hljs-keyword">typeof</span> packet.data === <span class="hljs-string">'undefined'</span>
+    ) {
       <span class="hljs-keyword">this</span>._trigger(<span class="hljs-string">'error'</span>, <span class="hljs-string">'Invalid format detected for packet'</span>, packet);
       <span class="hljs-keyword">return</span>;
     }
@@ -412,11 +432,11 @@ payload packets.</p>
         </li>
         
         
-        <li id="section-21">
+        <li id="section-22">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-21">&#182;</a>
+                <a class="pilcrow" href="#section-22">&#182;</a>
               </div>
               <p>Triggers an event of the given type, passing along the remaining arguments
 to all handlers that have been registered for the event.</p>
@@ -438,11 +458,11 @@ to all handlers that have been registered for the event.</p>
         </li>
         
         
-        <li id="section-22">
+        <li id="section-23">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-22">&#182;</a>
+                <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
               <p>Process the packet to ensure it conforms to the ESB requirements.  Sets
 the message id in the metadata for the packet if it wasn’t already set.
@@ -459,18 +479,6 @@ the delimiter between messages.</p>
 
   <span class="hljs-keyword">return</span> HelpEsb;
 }));</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-23">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-23">&#182;</a>
-              </div>
-              
-            </div>
             
         </li>
         
