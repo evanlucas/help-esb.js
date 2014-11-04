@@ -6,7 +6,7 @@ setTimeout(function() {
   client.send('asdf', {name: 'cool guy'});
 }, 2000);
 
-client.on('error', function(err) {
+client.on({type: 'error'}, function(err) {
   console.warn('Oh noes!');
   console.warn(err);
 });

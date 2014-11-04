@@ -1,5 +1,3 @@
-//     help-esb.js
-
 (function(root, factory) {
   'use strict';
 
@@ -48,10 +46,10 @@
 
     // Error handling is a bit simpler - we can just pass the error to the
     // user's configured error handler.
-    this._socket.on('error', this._trigger.bind(this, 'error'));
+    this._socket.on('error', this._trigger.bind(this, {type: 'error'}));
 
     // We begin with empty handlers.
-    this._handlers = {};
+    this._handlers = {type: {}, id: {}, group: {}};
 
     // Start with empty credentials and no authentication.
     this._credentials = {};
@@ -67,7 +65,7 @@
   //     client.login('clientName');
   HelpEsb.Client.prototype.login = function(name) {
     this._credentials.name = name;
-  }
+  };
 
   // ### HelpEsb.Client.subscribe
   // Register with the ESB and subscribe to an ESB group.  This returns a
@@ -79,35 +77,40 @@
   //     client.subscribe('a').then(function() {
   //       console.log('Subscribed!');
   //     });
-  HelpEsb.Client.prototype.subscribe = function(subscription) {
-    return this._authentication = this._sendRaw(this._massageOutboundPacket({
+  HelpEsb.Client.prototype.subscribe = function() {
+    return this._authentication = this._send({
       meta: {type: 'login'},
       data: _.extend(
         this._credentials,
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
-    }));
+    });
   };
 
   // ### HelpEsb.Client.on
-  // Register an event handler for the given event.  This may be called
+  // Register an event handler for the given events.  This may be called
   // multiple times to attach multiple event handlers for the same event or for
-  // different ones.  They will be called in the order they are added.  The
-  // events sent include: `payload`, and `error`.
+  // different ones.  They will be called in the order they are added.
   //
-  //     client.on('payload', function(data) {
+  //     client.on({group: 'foo'}, function(data) {
   //       console.log(data);
   //     });
-  //     client.on('error', function(error) {
+  //     client.on({type: 'error'}, function(error) {
   //       console.warn(error);
   //     });
-  HelpEsb.Client.prototype.on = function(name, cb) {
-    // Lazily initialize the handlers
-    if (typeof this._handlers[name] === 'undefined') {
-      this._handlers[name] = [];
-    }
+  HelpEsb.Client.prototype.on = function(events, cb) {
+    _.each(events, function(value, key) {
+      // Lazily initialize the handlers
+      if (typeof this._handlers[key] === 'undefined') {
+        this._handlers[key] = {};
+      }
 
-    this._handlers[name].push(cb);
+      if (typeof this._handlers[key][value] === 'undefined') {
+        this._handlers[key][value] = [];
+      }
+
+      this._handlers[key][value].push(cb);
+    }.bind(this));
   };
 
   // ### HelpEsb.Client.send
@@ -117,19 +120,22 @@
   //
   //     client.send('target', {id: 1234, message: 'Hello!'});
   HelpEsb.Client.prototype.send = function(group, data) {
-    return this._send(
-      {meta: {type: 'sendMessage'}, data: {group: group, message: data}}
-    );
+    return this._authenticated().then(function() {
+      return this._send(
+        {meta: {type: 'sendMessage', group: group}, data: data}
+      );
+    }.bind(this));
   };
 
   // ---
   // ### Private Methods
 
-  // Format the packet for the ESB and send it over the socket.
+  // Format the packet for the ESB and send it over the socket.  JSON encodes
+  // the message and appends a newline as the delimiter between messages.
   HelpEsb.Client.prototype._send = function(packet) {
-    return this._authenticated().then(function() {
-      this._sendRaw(this._massageOutboundPacket(packet));
-    }.bind(this));
+    packet = this._massageOutboundPacket(packet);
+
+    return this._sendRaw(JSON.stringify(packet) + "\n");
   };
 
   // Wait on the socket connection and once it is avaialable send the given
@@ -177,7 +183,7 @@
     try {
       packet = JSON.parse(packet);
     } catch (e) {
-      this._trigger('error', e);
+      this._trigger({type: 'error'}, e);
       return;
     }
 
@@ -186,35 +192,42 @@
       typeof packet.meta.type !== 'string' ||
       typeof packet.data === 'undefined'
     ) {
-      this._trigger('error', 'Invalid format detected for packet', packet);
+      this._trigger(
+        {type: 'error'},
+        'Invalid format detected for packet',
+        packet
+      );
       return;
     }
 
-    this._trigger(packet.meta.type, packet.data);
+    this._trigger(packet.meta, packet.data);
   };
 
-  // Triggers an event of the given type, passing along the remaining arguments
-  // to all handlers that have been registered for the event.
-  HelpEsb.Client.prototype._trigger = function(name) {
-    if (typeof this._handlers[name] === 'undefined') {
-      return;
-    }
-
+  // Triggers an event of the given types, passing along the remaining
+  // arguments to all handlers that have been registered.
+  HelpEsb.Client.prototype._trigger = function(identifiers) {
     var args = Array.prototype.slice.call(arguments, 1);
 
-    this._handlers[name].forEach(function(handler) {
-      handler.call({}, args);
-    });
+    _.each(identifiers, function(value, key) {
+      if (
+        typeof this._handlers[key] !== 'object' ||
+        typeof this._handlers[key][value] === 'undefined'
+      ) {
+        return;
+      }
+
+      this._handlers[key][value].forEach(function(handler) {
+        handler.apply({}, args);
+      });
+    }.bind(this));
   };
 
   // Process the packet to ensure it conforms to the ESB requirements.  Sets
   // the message id in the metadata for the packet if it wasn't already set.
-  // JSON encodes the message.  Finally, appends a newline to the message as
-  // the delimiter between messages.
   HelpEsb.Client.prototype._massageOutboundPacket = function(packet) {
     packet.meta.id = packet.meta.id || uuid.v4();
 
-    return JSON.stringify(packet) + "\n";
+    return packet;
   };
 
   return HelpEsb;
