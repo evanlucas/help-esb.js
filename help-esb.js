@@ -28,14 +28,15 @@
   HelpEsb.Client = function(host, port) {
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
-    this._socket = net.createConnection({host: host, port: port});
+    this._socket = Promise.promisifyAll(
+      net.createConnection({host: host, port: port})
+    );
     this._socket.setEncoding('utf-8');
 
     // We can't send anything over the socket until we have a connection.  We
     // immediately initiate the connection and save a promise for it so that
     // the client ensures the connection exists before trying to send data.
-    var promiseOn = Promise.promisify(this._socket.on, this._socket);
-    this._socketConnection = promiseOn('connect');
+    this._socketConnection = this._socket.onAsync('connect');
 
     // Handle data coming in over the socket using our special handler.
     // Because data can come in pieces, we have to keep a data buffer so that
@@ -94,18 +95,21 @@
   // that,, like the `subscribe` call, is fulfilled when the message is sent,
   // but does not indicate whether the message was received by the ESB.
   //
-  //     client.send({id: 1234, message: 'Hello!'});
-  HelpEsb.Client.prototype.send = function(data) {
-    return this._send({meta: {type: 'payload'}, data: data});
+  //     client.send('target', {id: 1234, message: 'Hello!'});
+  HelpEsb.Client.prototype.send = function(group, data) {
+    return this._send(
+      {meta: {type: 'sendMessage'}, data: {group: group, message: data}}
+    );
   };
 
-  // ### Private
+  // ---
+  // ### Private Methods
 
   // Wait on the socket connection and once it is available, send the
   // "massaged" and serialized packet in accordance with ESB requirements.
   HelpEsb.Client.prototype._send = function(packet) {
     return this._socketConnection.then(function() {
-      this._socket.write(this._massageOutboundPacket(packet));
+      return this._socket.writeAsync(this._massageOutboundPacket(packet));
     }.bind(this));
   };
 
@@ -144,7 +148,11 @@
       return;
     }
 
-    if (typeof packet.meta !== 'object' || typeof packet.meta.type !== 'string' || typeof packet.data === 'undefined') {
+    if (
+      typeof packet.meta !== 'object' ||
+      typeof packet.meta.type !== 'string' ||
+      typeof packet.data === 'undefined'
+    ) {
       this._trigger('error', 'Invalid format detected for packet', packet);
       return;
     }
@@ -178,5 +186,3 @@
 
   return HelpEsb;
 }));
-
-// [bluebird]: https://github.com/petkaantonov/bluebird
