@@ -46,10 +46,10 @@
 
     // Error handling is a bit simpler - we can just pass the error to the
     // user's configured error handler.
-    this._socket.on('error', this._trigger.bind(this, 'error'));
+    this._socket.on('error', this._trigger.bind(this, {type: 'error'}));
 
     // We begin with empty handlers.
-    this._handlers = {};
+    this._handlers = {type: {}, id: {}, group: {}};
 
     // Start with empty credentials and no authentication.
     this._credentials = {};
@@ -88,24 +88,29 @@
   };
 
   // ### HelpEsb.Client.on
-  // Register an event handler for the given event.  This may be called
+  // Register an event handler for the given events.  This may be called
   // multiple times to attach multiple event handlers for the same event or for
-  // different ones.  They will be called in the order they are added.  The
-  // events sent include: `payload`, and `error`.
+  // different ones.  They will be called in the order they are added.
   //
-  //     client.on('payload', function(data) {
+  //     client.on({type: 'payload'}, function(data) {
   //       console.log(data);
   //     });
-  //     client.on('error', function(error) {
+  //     client.on({type: 'error'}, function(error) {
   //       console.warn(error);
   //     });
-  HelpEsb.Client.prototype.on = function(name, cb) {
-    // Lazily initialize the handlers
-    if (typeof this._handlers[name] === 'undefined') {
-      this._handlers[name] = [];
-    }
+  HelpEsb.Client.prototype.on = function(events, cb) {
+    _.each(events, function(value, key) {
+      // Lazily initialize the handlers
+      if (typeof this._handlers[key] === 'undefined') {
+        this._handlers[key] = {};
+      }
 
-    this._handlers[name].push(cb);
+      if (typeof this._handlers[key][value] === 'undefined') {
+        this._handlers[key][value] = [];
+      }
+
+      this._handlers[key][value].push(cb);
+    }.bind(this));
   };
 
   // ### HelpEsb.Client.send
@@ -175,7 +180,7 @@
     try {
       packet = JSON.parse(packet);
     } catch (e) {
-      this._trigger('error', e);
+      this._trigger({type: 'error'}, e);
       return;
     }
 
@@ -184,25 +189,34 @@
       typeof packet.meta.type !== 'string' ||
       typeof packet.data === 'undefined'
     ) {
-      this._trigger('error', 'Invalid format detected for packet', packet);
+      this._trigger(
+        {type: 'error'},
+        'Invalid format detected for packet',
+        packet
+      );
       return;
     }
 
-    this._trigger(packet.meta.type, packet.data);
+    this._trigger(packet.meta, packet.data);
   };
 
-  // Triggers an event of the given type, passing along the remaining arguments
-  // to all handlers that have been registered for the event.
-  HelpEsb.Client.prototype._trigger = function(name) {
-    if (typeof this._handlers[name] === 'undefined') {
-      return;
-    }
-
+  // Triggers an event of the given types, passing along the remaining
+  // arguments to all handlers that have been registered.
+  HelpEsb.Client.prototype._trigger = function(identifiers) {
     var args = Array.prototype.slice.call(arguments, 1);
 
-    this._handlers[name].forEach(function(handler) {
-      handler.call({}, args);
-    });
+    _.each(identifiers, function(value, key) {
+      if (
+        typeof this._handlers[key] !== 'object' ||
+        typeof this._handlers[key][value] === 'undefined'
+      ) {
+        return;
+      }
+
+      this._handlers[key][value].forEach(function(handler) {
+        handler.call({}, args);
+      });
+    }.bind(this));
   };
 
   // Process the packet to ensure it conforms to the ESB requirements.  Sets
