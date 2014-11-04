@@ -101,6 +101,7 @@
     );
   };
 
+  // ---
   // ### Private Methods
 
   // Wait on the socket connection and once it is available, send the
