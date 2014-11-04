@@ -1,13 +1,13 @@
 var HelpEsb = require('../help-esb');
-var client = new HelpEsb.Client('54.165.246.18', 22);
+var client = new HelpEsb.Client(process.env.ESB_HOST, process.env.ESB_PORT);
 client.subscribe('foo', ['asdf']);
 
 client.on('payload', function(data) {
-  console.log("Received data:");
+  console.log('Received data:');
   console.log(data);
 });
 
 client.on('error', function(err) {
-  console.warn("Oh noes!");
+  console.warn('Oh noes!');
   console.warn(err);
 });
