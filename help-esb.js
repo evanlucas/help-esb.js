@@ -78,13 +78,13 @@
   //       console.log('Subscribed!');
   //     });
   HelpEsb.Client.prototype.subscribe = function() {
-    return this._authentication = this._sendRaw(this._massageOutboundPacket({
+    return this._authentication = this._send({
       meta: {type: 'login'},
       data: _.extend(
         this._credentials,
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
-    }));
+    });
   };
 
   // ### HelpEsb.Client.on
@@ -115,7 +115,11 @@
   //
   //     client.send('target', {id: 1234, message: 'Hello!'});
   HelpEsb.Client.prototype.send = function(group, data) {
-    return this._send({meta: {type: 'sendMessage', group: group}, data: data});
+    return this._authenticated().then(function() {
+      return this._send(
+        {meta: {type: 'sendMessage', group: group}, data: data}
+      );
+    }.bind(this));
   };
 
   // ---
@@ -123,9 +127,7 @@
 
   // Format the packet for the ESB and send it over the socket.
   HelpEsb.Client.prototype._send = function(packet) {
-    return this._authenticated().then(function() {
-      return this._sendRaw(this._massageOutboundPacket(packet));
-    }.bind(this));
+    return this._sendRaw(this._massageOutboundPacket(packet));
   };
 
   // Wait on the socket connection and once it is avaialable send the given
