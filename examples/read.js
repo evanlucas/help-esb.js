@@ -3,7 +3,7 @@ var client = new HelpEsb.Client(process.env.ESB_HOST, process.env.ESB_PORT);
 client.login('foo');
 client.subscribe('asdf');
 
-client.on({type: 'payload'}, function(data) {
+client.on({group: 'asdf'}, function(data) {
   console.log('Received data:');
   console.log(data);
 });

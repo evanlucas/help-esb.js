@@ -92,7 +92,7 @@
   // multiple times to attach multiple event handlers for the same event or for
   // different ones.  They will be called in the order they are added.
   //
-  //     client.on({type: 'payload'}, function(data) {
+  //     client.on({group: 'foo'}, function(data) {
   //       console.log(data);
   //     });
   //     client.on({type: 'error'}, function(error) {
