@@ -94,9 +94,11 @@
   // that,, like the `subscribe` call, is fulfilled when the message is sent,
   // but does not indicate whether the message was received by the ESB.
   //
-  //     client.send({id: 1234, message: 'Hello!'});
-  HelpEsb.Client.prototype.send = function(data) {
-    return this._send({meta: {type: 'payload'}, data: data});
+  //     client.send('target', {id: 1234, message: 'Hello!'});
+  HelpEsb.Client.prototype.send = function(group, data) {
+    return this._send(
+      {meta: {type: 'sendMessage'}, data: {group: group, message: data}}
+    );
   };
 
   // ### Private
