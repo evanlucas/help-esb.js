@@ -130,9 +130,12 @@
   // ---
   // ### Private Methods
 
-  // Format the packet for the ESB and send it over the socket.
+  // Format the packet for the ESB and send it over the socket.  JSON encodes
+  // the message and appends a newline as the delimiter between messages.
   HelpEsb.Client.prototype._send = function(packet) {
-    return this._sendRaw(this._massageOutboundPacket(packet));
+    packet = this._massageOutboundPacket(packet);
+
+    return this._sendRaw(JSON.stringify(packet) + "\n");
   };
 
   // Wait on the socket connection and once it is avaialable send the given
@@ -221,12 +224,10 @@
 
   // Process the packet to ensure it conforms to the ESB requirements.  Sets
   // the message id in the metadata for the packet if it wasn't already set.
-  // JSON encodes the message.  Finally, appends a newline to the message as
-  // the delimiter between messages.
   HelpEsb.Client.prototype._massageOutboundPacket = function(packet) {
     packet.meta.id = packet.meta.id || uuid.v4();
 
-    return JSON.stringify(packet) + "\n";
+    return packet;
   };
 
   return HelpEsb;
