@@ -132,9 +132,10 @@
   // Sends the packet like **send**, but returns a promise for a response from
   // some other service.  This uses the autogen message id and relies on the
   // other service properly publishing a message with a proper replyTo.
-  HelpEsb.Client.prototype.rpcSend = Promise.promisify(
-    HelpEsb.Client.prototype._send
-  );
+  HelpEsb.Client.prototype.rpcSend = function(packet) {
+    var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
+    return send(packet).then(this._checkRpcResult);
+  };
 
   // ---
   // ### Private Methods
@@ -149,15 +150,26 @@
       this.on({replyTo: packet.meta.id}, _.partial(replyCallback, null));
     }
 
-    return this._sendRaw(JSON.stringify(packet) + "\n");
+    return this._sendRaw(JSON.stringify(packet) + '\n');
   };
 
   // Sends the packet like **_send**, but returns a promise for a response from
   // some other service.  This uses the autogen message id and relies on the
   // other service properly publishing a message with a proper replyTo.
-  HelpEsb.Client.prototype._rpcSend = Promise.promisify(
-    HelpEsb.Client.prototype.send
-  );
+  HelpEsb.Client.prototype._rpcSend = function(packet) {
+    var send = Promise.promisify(HelpEsb.Client.prototype._send).bind(this);
+    return send(packet).then(this._checkRpcResult);
+  };
+
+  // Checks an RPC response and fails the promise if the response is not
+  // successful.
+  HelpEsb.Client.prototype._checkRpcResult = function(response) {
+    if (response.result !== 'SUCCESS') {
+      return Promise.reject(response);
+    }
+
+    return Promise.resolve(response);
+  };
 
   // Wait on the socket connection and once it is avaialable send the given
   // string data returning a promise of the data being sent.
