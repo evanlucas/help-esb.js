@@ -78,7 +78,7 @@
   //       console.log('Subscribed!');
   //     });
   HelpEsb.Client.prototype.subscribe = function() {
-    return this._authentication = this._send({
+    return this._authentication = this._rpcSend({
       meta: {type: 'login'},
       data: _.extend(
         this._credentials,
