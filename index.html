@@ -83,7 +83,8 @@ means this only works on Node.js, but meh.</p>
               </div>
               <h3 id="helpesb-client-constructor-">HelpEsb.Client <em>constructor</em></h3>
 <p>The client connects to the ESB running on the given host/port.  You will
-need to <strong>login</strong> and <strong>subscribe</strong> before doing anything over the
+need to <a href="#helpesb-client-login">login</a> and
+<a href="#helpesb-client-subscribe">subscribe</a> before doing anything over the
 connection.</p>
 <pre><code><span class="hljs-keyword">var</span> client = Esb.Client(<span class="hljs-string">'example.com'</span>, <span class="hljs-number">1234</span>);
 client.login(<span class="hljs-string">'clientName'</span>);
@@ -245,7 +246,7 @@ promise does not indicate that the subscription was successful on the ESB.</p>
         <span class="hljs-keyword">this</span>._credentials,
         {subscriptions: <span class="hljs-built_in">Array</span>.prototype.slice.call(<span class="hljs-built_in">arguments</span>)}
       )
-    });
+    }, <span class="hljs-number">5000</span>);
   };</pre></div></div>
             
         </li>
@@ -309,9 +310,10 @@ client.on({type: <span class="hljs-string">'error'</span>}, <span class="hljs-fu
               </div>
               <h3 id="helpesb-client-send">HelpEsb.Client.send</h3>
 <p>Sends a payload message to the ESB with the given data.  Returns a promise
-that,, like the <strong>subscribe</strong> call, is fulfilled when the message is sent,
-but does not indicate whether the message was received by the ESB or by
-any subscribers.  For RPC-esque behavior, use <strong>rpcSend</strong>.</p>
+that,, like the <a href="#helpesb-client-subscribe">subscribe</a> call, is fulfilled
+when the message is sent, but does not indicate whether the message was
+received by the ESB or by any subscribers.  For RPC-esque behavior, use
+<a href="#helpesb-client-rpcsend">rpcSend</a>.</p>
 <pre><code>client.send(<span class="hljs-string">'target'</span>, {id: <span class="hljs-number">1234</span>, message: <span class="hljs-string">'Hello!'</span>});
 </code></pre>
             </div>
@@ -334,15 +336,24 @@ any subscribers.  For RPC-esque behavior, use <strong>rpcSend</strong>.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-16">&#182;</a>
               </div>
-              <p>Sends the packet like <strong>send</strong>, but returns a promise for a response from
-some other service.  This uses the autogen message id and relies on the
-other service properly publishing a message with a proper replyTo.</p>
+              <h3 id="helpesb-client-rpcsend">HelpEsb.Client.rpcSend</h3>
+<p>Sends the packet like <a href="#helpesb-client-send">send</a>, but returns a promise
+for a response from some other service.  This uses the autogen message id
+and relies on the other service properly publishing a message with a
+proper replyTo.  If a timeout is given, then the promise will be rejected
+if no reply is received before the timeout.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet, timeout)</span> </span>{
     <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype.send).bind(<span class="hljs-keyword">this</span>);
-    <span class="hljs-keyword">return</span> send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+    <span class="hljs-keyword">var</span> result = send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+
+    <span class="hljs-keyword">if</span> (timeout !== <span class="hljs-literal">undefined</span>) {
+      result = result.timeout(timeout);
+    }
+
+    <span class="hljs-keyword">return</span> result;
   };</pre></div></div>
             
         </li>
@@ -419,13 +430,21 @@ the message and appends a newline as the delimiter between messages.</p>
               </div>
               <p>Sends the packet like <strong>_send</strong>, but returns a promise for a response from
 some other service.  This uses the autogen message id and relies on the
-other service properly publishing a message with a proper replyTo.</p>
+other service properly publishing a message with a proper replyTo.  If a
+timeout is given, then the promise will be rejected if no reply is
+received before the timeout.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet, timeout)</span> </span>{
     <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype._send).bind(<span class="hljs-keyword">this</span>);
-    <span class="hljs-keyword">return</span> send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+    <span class="hljs-keyword">var</span> result = send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+
+    <span class="hljs-keyword">if</span> (timeout !== <span class="hljs-literal">undefined</span>) {
+      result = result.timeout(timeout);
+    }
+
+    <span class="hljs-keyword">return</span> result;
   };</pre></div></div>
             
         </li>
