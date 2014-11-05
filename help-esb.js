@@ -133,7 +133,7 @@
   // some other service.  This uses the autogen message id and relies on the
   // other service properly publishing a message with a proper replyTo.
   HelpEsb.Client.prototype.rpcSend = Promise.promisify(
-    HelpEsb.Client.prototype._send
+    HelpEsb.Client.prototype.send
   );
 
   // ---
