@@ -78,7 +78,7 @@
   //       console.log('Subscribed!');
   //     });
   HelpEsb.Client.prototype.subscribe = function() {
-    return this._authentication = this._send({
+    return this._authentication = this._rpcSend({
       meta: {type: 'login'},
       data: _.extend(
         this._credentials,
@@ -115,28 +115,49 @@
 
   // ### HelpEsb.Client.send
   // Sends a payload message to the ESB with the given data.  Returns a promise
-  // that,, like the `subscribe` call, is fulfilled when the message is sent,
-  // but does not indicate whether the message was received by the ESB.
+  // that,, like the **subscribe** call, is fulfilled when the message is sent,
+  // but does not indicate whether the message was received by the ESB or by
+  // any subscribers.  For RPC-esque behavior, use **rpcSend**.
   //
   //     client.send('target', {id: 1234, message: 'Hello!'});
-  HelpEsb.Client.prototype.send = function(group, data) {
+  HelpEsb.Client.prototype.send = function(group, data, replyCallback) {
     return this._authenticated().then(function() {
       return this._send(
-        {meta: {type: 'sendMessage', group: group}, data: data}
+        {meta: {type: 'sendMessage', group: group}, data: data},
+        replyCallback
       );
     }.bind(this));
   };
+
+  // Sends the packet like **send**, but returns a promise for a response from
+  // some other service.  This uses the autogen message id and relies on the
+  // other service properly publishing a message with a proper replyTo.
+  HelpEsb.Client.prototype.rpcSend = Promise.promisify(
+    HelpEsb.Client.prototype._send
+  );
 
   // ---
   // ### Private Methods
 
   // Format the packet for the ESB and send it over the socket.  JSON encodes
   // the message and appends a newline as the delimiter between messages.
-  HelpEsb.Client.prototype._send = function(packet) {
+  HelpEsb.Client.prototype._send = function(packet, replyCallback) {
     packet = this._massageOutboundPacket(packet);
+
+    // Register a callback for replies to this message if a callback is given.
+    if (replyCallback) {
+      this.on({replyTo: packet.meta.id}, _.partial(replyCallback, null));
+    }
 
     return this._sendRaw(JSON.stringify(packet) + "\n");
   };
+
+  // Sends the packet like **_send**, but returns a promise for a response from
+  // some other service.  This uses the autogen message id and relies on the
+  // other service properly publishing a message with a proper replyTo.
+  HelpEsb.Client.prototype._rpcSend = Promise.promisify(
+    HelpEsb.Client.prototype.send
+  );
 
   // Wait on the socket connection and once it is avaialable send the given
   // string data returning a promise of the data being sent.
