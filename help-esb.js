@@ -116,9 +116,9 @@
   // for a response from some other service.  This uses the autogen message id
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
-  HelpEsb.Client.prototype.rpcSend = function(packet) {
+  HelpEsb.Client.prototype.rpcSend = function(group, data) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    return send(group, data).then(this._checkRpcResult);
   };
 
   // ---
