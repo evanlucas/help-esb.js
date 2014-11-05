@@ -84,7 +84,7 @@
         this._credentials,
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
-    });
+    }, 5000);
   };
 
   // ### HelpEsb.Client.on
@@ -131,10 +131,18 @@
 
   // Sends the packet like **send**, but returns a promise for a response from
   // some other service.  This uses the autogen message id and relies on the
-  // other service properly publishing a message with a proper replyTo.
-  HelpEsb.Client.prototype.rpcSend = function(packet) {
+  // other service properly publishing a message with a proper replyTo.  If a
+  // timeout is given, then the promise will be rejected if no reply is
+  // received before the timeout.
+  HelpEsb.Client.prototype.rpcSend = function(packet, timeout) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    var result = send(packet).then(this._checkRpcResult);
+
+    if (timeout !== undefined) {
+      result = result.timeout(timeout);
+    }
+
+    return result;
   };
 
   // ---
@@ -155,10 +163,18 @@
 
   // Sends the packet like **_send**, but returns a promise for a response from
   // some other service.  This uses the autogen message id and relies on the
-  // other service properly publishing a message with a proper replyTo.
-  HelpEsb.Client.prototype._rpcSend = function(packet) {
+  // other service properly publishing a message with a proper replyTo.  If a
+  // timeout is given, then the promise will be rejected if no reply is
+  // received before the timeout.
+  HelpEsb.Client.prototype._rpcSend = function(packet, timeout) {
     var send = Promise.promisify(HelpEsb.Client.prototype._send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    var result = send(packet).then(this._checkRpcResult);
+
+    if (timeout !== undefined) {
+      result = result.timeout(timeout);
+    }
+
+    return result;
   };
 
   // Checks an RPC response and fails the promise if the response is not
