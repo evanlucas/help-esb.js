@@ -149,7 +149,7 @@
       this.on({replyTo: packet.meta.id}, _.partial(replyCallback, null));
     }
 
-    return this._sendRaw(JSON.stringify(packet) + "\n");
+    return this._sendRaw(JSON.stringify(packet) + '\n');
   };
 
   // Sends the packet like **_send**, but returns a promise for a response from
