@@ -56,9 +56,6 @@
     // user's configured error handler.
     this._socket.on('error', this.emit.bind(this, 'type.error'));
 
-    // We begin with empty handlers.
-    this._handlers = {type: {}, id: {}, group: {}};
-
     // Start with empty credentials and no authentication.
     this._credentials = {};
     this._authentication = null;
