@@ -56,9 +56,6 @@
     // user's configured error handler.
     this._socket.on('error', this.emit.bind(this, 'type.error'));
 
-    // We begin with empty handlers.
-    this._handlers = {type: {}, id: {}, group: {}};
-
     // Start with empty credentials and no authentication.
     this._credentials = {};
     this._authentication = null;
@@ -119,9 +116,64 @@
   // for a response from some other service.  This uses the autogen message id
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
-  HelpEsb.Client.prototype.rpcSend = function(packet) {
+  //
+  //     client.rpcSend('foo', {name: 'John'}).then(function(response) {
+  //       console.log(response);
+  //     }).catch(function(error) {
+  //       console.error(error);
+  //     });
+  HelpEsb.Client.prototype.rpcSend = function(group, data) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    return send(group, data).spread(this._checkRpcResult);
+  };
+
+  // ### HelpEsb.Client.rpcReceive
+  // Listen on the given group like [on](#helpesb-client-on), and call the
+  // given callback with any messages.  The value returned by the callback is
+  // sent to the GROUPNAME-result group in reply to the incoming message.
+  //
+  //     client.subscribe('foo');
+  //     client.rpcReceive('foo', function(data) {
+  //       return {greeting: 'Hello ' + (data.name || 'Stranger')};
+  //     });
+  //
+  // If the callback returns a promise, the result of the promise is sent.
+  //     client.rpcReceive('foo', function(data) {
+  //       return request.getAsync('http://www.google.com');
+  //     });
+  //
+  // Errors are also handled and errors are sent as the "reason" through the
+  // ESB.
+  //     client.rpcReceive('foo', function(data) {
+  //       throw new Error('Not implemented!');
+  //     });
+  HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
+    this.on('group.' + group, function(data, incomingMeta) {
+      // Link up our reply to the incoming request but on the "result" group.
+      var meta = {
+        type: 'sendMessage',
+        group: group + '-result',
+        replyTo: incomingMeta.id
+      };
+
+      // Catch thrown errors so that we can send the result through the ESB.
+      var result = null;
+      try {
+        result = Promise.resolve(cb(data));
+      } catch(e) {
+        result = Promise.reject(e.toString());
+      }
+
+      result.then(function(data) {
+        return this._send(
+          {meta: meta, data: _.extend({result: 'SUCCESS', data)}
+        );
+      }.bind(this)).catch(function(error) {
+        return this._send(
+          {meta: meta, data: {result: 'FAILURE', reason: error}}
+        );
+      }.bind(this));
+    }.bind(this));
   };
 
   // ---
@@ -145,7 +197,7 @@
   // other service properly publishing a message with a proper replyTo.
   HelpEsb.Client.prototype._rpcSend = function(packet) {
     var send = Promise.promisify(HelpEsb.Client.prototype._send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    return send(packet).spread(this._checkRpcResult);
   };
 
   // Checks an RPC response and fails the promise if the response is not
@@ -217,7 +269,7 @@
     }
 
     _.each(packet.meta, function(value, key) {
-      this.emit(key + '.' + value, packet.data);
+      this.emit(key + '.' + value, packet.data, packet.meta);
     }.bind(this));
   };
 
