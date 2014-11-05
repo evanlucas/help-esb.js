@@ -340,9 +340,10 @@ other service properly publishing a message with a proper replyTo.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = Promise.promisify(
-    HelpEsb.Client.prototype._send
-  );</pre></div></div>
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+    <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype.send).bind(<span class="hljs-keyword">this</span>);
+    <span class="hljs-keyword">return</span> send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+  };</pre></div></div>
             
         </li>
         
@@ -404,7 +405,7 @@ the message and appends a newline as the delimiter between messages.</p>
       <span class="hljs-keyword">this</span>.on({replyTo: packet.meta.id}, _.partial(replyCallback, <span class="hljs-literal">null</span>));
     }
 
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._sendRaw(<span class="hljs-built_in">JSON</span>.stringify(packet) + <span class="hljs-string">"\n"</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._sendRaw(<span class="hljs-built_in">JSON</span>.stringify(packet) + <span class="hljs-string">'\n'</span>);
   };</pre></div></div>
             
         </li>
@@ -422,9 +423,10 @@ other service properly publishing a message with a proper replyTo.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = Promise.promisify(
-    HelpEsb.Client.prototype.send
-  );</pre></div></div>
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+    <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype._send).bind(<span class="hljs-keyword">this</span>);
+    <span class="hljs-keyword">return</span> send(packet).then(<span class="hljs-keyword">this</span>._checkRpcResult);
+  };</pre></div></div>
             
         </li>
         
@@ -434,6 +436,28 @@ other service properly publishing a message with a proper replyTo.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>Checks an RPC response and fails the promise if the response is not
+successful.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._checkRpcResult = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
+    <span class="hljs-keyword">if</span> (response.result !== <span class="hljs-string">'SUCCESS'</span>) {
+      <span class="hljs-keyword">return</span> Promise.reject(response);
+    }
+
+    <span class="hljs-keyword">return</span> Promise.resolve(response);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
               <p>Wait on the socket connection and once it is avaialable send the given
 string data returning a promise of the data being sent.</p>
@@ -449,11 +473,11 @@ string data returning a promise of the data being sent.</p>
         </li>
         
         
-        <li id="section-23">
+        <li id="section-24">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-23">&#182;</a>
+                <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
               <p>Returns the promise of authentication if the user has already subscribed,
 otherwise it just subscribes to nothing in order to at least authenticate.</p>
@@ -467,11 +491,11 @@ otherwise it just subscribes to nothing in order to at least authenticate.</p>
         </li>
         
         
-        <li id="section-24">
+        <li id="section-25">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-24">&#182;</a>
+                <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
               <p>Handle an incoming slice of data over the socket.  Split the message on
 the newline delimiters and pass each complete packet to <code>_handlePacket</code>.</p>
@@ -483,11 +507,11 @@ the newline delimiters and pass each complete packet to <code>_handlePacket</cod
         </li>
         
         
-        <li id="section-25">
+        <li id="section-26">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-25">&#182;</a>
+                <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <p>Continue to append to the buffer.  The full message may not come in one
 piece.</p>
@@ -500,11 +524,11 @@ piece.</p>
         </li>
         
         
-        <li id="section-26">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-26">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>It is even possible that multiple packets were sent at once and so we
 need to make sure we parse all of them.</p>
@@ -516,11 +540,11 @@ need to make sure we parse all of them.</p>
         </li>
         
         
-        <li id="section-27">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <p>The section after the last newline (which may be empty) is kept in the
 buffer as it belongs to the next packet.</p>
@@ -536,11 +560,11 @@ buffer as it belongs to the next packet.</p>
         </li>
         
         
-        <li id="section-28">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <p>Handles a single packet of data.  The data is expected to be JSON, and if
 it isn’t, an error will be triggered through the event handler.
@@ -579,11 +603,11 @@ payload packets.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <p>Triggers an event of the given types, passing along the remaining
 arguments to all handlers that have been registered.</p>
@@ -610,11 +634,11 @@ arguments to all handlers that have been registered.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Process the packet to ensure it conforms to the ESB requirements.  Sets
 the message id in the metadata for the packet if it wasn’t already set.</p>
