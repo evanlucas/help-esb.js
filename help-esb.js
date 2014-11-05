@@ -118,7 +118,7 @@
   // proper replyTo.
   HelpEsb.Client.prototype.rpcSend = function(group, data) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(group, data).then(this._checkRpcResult);
+    return send(group, data).spread(this._checkRpcResult);
   };
 
   // ---
@@ -142,7 +142,7 @@
   // other service properly publishing a message with a proper replyTo.
   HelpEsb.Client.prototype._rpcSend = function(packet) {
     var send = Promise.promisify(HelpEsb.Client.prototype._send).bind(this);
-    return send(packet).then(this._checkRpcResult);
+    return send(packet).spread(this._checkRpcResult);
   };
 
   // Checks an RPC response and fails the promise if the response is not
@@ -214,7 +214,7 @@
     }
 
     _.each(packet.meta, function(value, key) {
-      this.emit(key + '.' + value, packet.data);
+      this.emit(key + '.' + value, packet.data, packet.meta);
     }.bind(this));
   };
 
