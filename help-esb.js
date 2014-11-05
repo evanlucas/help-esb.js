@@ -127,6 +127,55 @@
     return send(group, data).spread(this._checkRpcResult);
   };
 
+  // ### HelpEsb.Client.rpcReceive
+  // Listen on the given group like [on](#helpesb-client-on), and call the
+  // given callback with any messages.  The value returned by the callback is
+  // sent to the GROUPNAME-result group in reply to the incoming message.
+  //
+  //     client.subscribe('foo');
+  //     client.rpcReceive('foo', function(data) {
+  //       return {greeting: 'Hello ' + (data.name || 'Stranger')};
+  //     });
+  //
+  // If the callback returns a promise, the result of the promise is sent.
+  //     client.rpcReceive('foo', function(data) {
+  //       return request.getAsync('http://www.google.com');
+  //     });
+  //
+  // Errors are also handled and errors are sent as the "reason" through the
+  // ESB.
+  //     client.rpcReceive('foo', function(data) {
+  //       throw new Error('Not implemented!');
+  //     });
+  HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
+    this.on('group.' + group, function(data, incomingMeta) {
+      // Link up our reply to the incoming request but on the "result" group.
+      var meta = {
+        type: 'sendMessage',
+        group: group + '-result',
+        replyTo: incomingMeta.id
+      };
+
+      // Catch thrown errors so that we can send the result through the ESB.
+      var result = null;
+      try {
+        result = Promise.resolve(cb(data));
+      } catch(e) {
+        result = Promise.reject(e.toString());
+      }
+
+      result.then(function(data) {
+        return this._send(
+          {meta: meta, data: _.extend({result: 'SUCCESS', data)}
+        );
+      }.bind(this)).catch(function(error) {
+        return this._send(
+          {meta: meta, data: {result: 'FAILURE', reason: error}}
+        );
+      }.bind(this));
+    }.bind(this));
+  };
+
   // ---
   // ### Private Methods
 
