@@ -3,16 +3,16 @@
 
   // Setup HelpEsb appropriately for the environment.  Dependency on net likely
   // means this only works on Node.js, but meh.
-  if (typeof define === 'function' && define.amd) {
-    define(['net', 'bluebird', 'uuid', 'lodash'], function(net, Promise, uuid, _) {
-      root.HelpEsb = factory(exports, net, Promise, uuid, _);
-    });
-  } else if (typeof exports !== 'undefined') {
-    factory(exports, require('net'), require('bluebird'), require('uuid'), require('lodash'));
-  } else {
-    root.HelpEsb = factory({}, root.net, root.Promise, root.uuid, root._);
-  }
-}(this, function(HelpEsb, net, Promise, uuid, _) {
+  factory(
+    exports,
+    require('net'),
+    require('events').EventEmitter,
+    require('util'),
+    require('bluebird'),
+    require('uuid'),
+    require('lodash')
+  );
+}(this, function(HelpEsb, net, EventEmitter, util, Promise, uuid, _) {
   'use strict';
 
   // ## HelpEsb.Client
@@ -26,7 +26,14 @@
   //     var client = Esb.Client('example.com', 1234);
   //     client.login('clientName');
   //     client.subscribe('subscriptionChannel1');
+  //     client.on('type.error', console.error);
+  //     client.on('group.subscriptionChannel1', function(data) {
+  //       // Process data
+  //     });
   HelpEsb.Client = function(host, port) {
+    // Extend EventEmitter to handle events.
+    EventEmitter.call(this);
+
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
     this._socket = Promise.promisifyAll(
@@ -47,7 +54,7 @@
 
     // Error handling is a bit simpler - we can just pass the error to the
     // user's configured error handler.
-    this._socket.on('error', this._trigger.bind(this, {type: 'error'}));
+    this._socket.on('error', this.emit.bind(this, 'type.error'));
 
     // We begin with empty handlers.
     this._handlers = {type: {}, id: {}, group: {}};
@@ -56,6 +63,8 @@
     this._credentials = {};
     this._authentication = null;
   };
+
+  util.inherits(HelpEsb.Client, EventEmitter);
 
   // ### HelpEsb.Client.login
   // Set authentication credentials for use with the ESB.  Right now, this does
@@ -86,32 +95,6 @@
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
     }).timeout(5000);
-  };
-
-  // ### HelpEsb.Client.on
-  // Register an event handler for the given events.  This may be called
-  // multiple times to attach multiple event handlers for the same event or for
-  // different ones.  They will be called in the order they are added.
-  //
-  //     client.on({group: 'foo'}, function(data) {
-  //       console.log(data);
-  //     });
-  //     client.on({type: 'error'}, function(error) {
-  //       console.warn(error);
-  //     });
-  HelpEsb.Client.prototype.on = function(events, cb) {
-    _.each(events, function(value, key) {
-      // Lazily initialize the handlers
-      if (typeof this._handlers[key] === 'undefined') {
-        this._handlers[key] = {};
-      }
-
-      if (typeof this._handlers[key][value] === 'undefined') {
-        this._handlers[key][value] = [];
-      }
-
-      this._handlers[key][value].push(cb);
-    }.bind(this));
   };
 
   // ### HelpEsb.Client.send
@@ -151,7 +134,7 @@
 
     // Register a callback for replies to this message if a callback is given.
     if (replyCallback) {
-      this.on({replyTo: packet.meta.id}, _.partial(replyCallback, null));
+      this.on('replyTo.' + packet.meta.id, _.partial(replyCallback, null));
     }
 
     return this._sendRaw(JSON.stringify(packet) + '\n');
@@ -220,7 +203,7 @@
     try {
       packet = JSON.parse(packet);
     } catch (e) {
-      this._trigger({type: 'error'}, e);
+      this.emit('type.error', e);
       return;
     }
 
@@ -229,33 +212,12 @@
       typeof packet.meta.type !== 'string' ||
       typeof packet.data === 'undefined'
     ) {
-      this._trigger(
-        {type: 'error'},
-        'Invalid format detected for packet',
-        packet
-      );
+      this.emit('type.error', 'Invalid format detected for packet', packet);
       return;
     }
 
-    this._trigger(packet.meta, packet.data);
-  };
-
-  // Triggers an event of the given types, passing along the remaining
-  // arguments to all handlers that have been registered.
-  HelpEsb.Client.prototype._trigger = function(identifiers) {
-    var args = Array.prototype.slice.call(arguments, 1);
-
-    _.each(identifiers, function(value, key) {
-      if (
-        typeof this._handlers[key] !== 'object' ||
-        typeof this._handlers[key][value] === 'undefined'
-      ) {
-        return;
-      }
-
-      this._handlers[key][value].forEach(function(handler) {
-        handler.apply({}, args);
-      });
+    _.each(packet.meta, function(value, key) {
+      this.emit(key + '.' + value, packet.data);
     }.bind(this));
   };
 
