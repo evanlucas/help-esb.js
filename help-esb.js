@@ -134,7 +134,7 @@
 
     // Register a callback for replies to this message if a callback is given.
     if (replyCallback) {
-      this.on('replyTo.' + packet.meta.id, _.partial(replyCallback, null));
+      this.once('replyTo.' + packet.meta.id, _.partial(replyCallback, null));
     }
 
     return this._sendRaw(JSON.stringify(packet) + '\n');
