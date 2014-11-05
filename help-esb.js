@@ -85,7 +85,7 @@
         this._credentials,
         {subscriptions: Array.prototype.slice.call(arguments)}
       )
-    });
+    }).timeout(5000);
   };
 
   // ### HelpEsb.Client.on
