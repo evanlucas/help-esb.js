@@ -8,11 +8,12 @@
     require('net'),
     require('events').EventEmitter,
     require('util'),
+    require('url'),
     require('bluebird'),
     require('uuid'),
     require('lodash')
   );
-}(this, function(HelpEsb, net, EventEmitter, util, Promise, uuid, _) {
+}(this, function(HelpEsb, net, EventEmitter, util, url, Promise, uuid, _) {
   'use strict';
 
   // ## HelpEsb.Client
@@ -23,21 +24,22 @@
   // [subscribe](#helpesb-client-subscribe) before doing anything over the
   // connection.
   //
-  //     var client = Esb.Client('example.com', 1234);
+  //     var client = Esb.Client('tcp://example.com:1234');
   //     client.login('clientName');
   //     client.subscribe('subscriptionChannel1');
   //     client.on('type.error', console.error);
   //     client.on('group.subscriptionChannel1', function(data) {
   //       // Process data
   //     });
-  HelpEsb.Client = function(host, port) {
+  HelpEsb.Client = function(uri) {
     // Extend EventEmitter to handle events.
     EventEmitter.call(this);
 
+    var uriObj = url.parse(uri);
     // This uses the basic socket connection to the ESB.  We are forcing utf-8
     // here as we shouldn't really use anything else.
     this._socket = Promise.promisifyAll(
-      net.createConnection({host: host, port: port})
+      net.createConnection({host: uriObj.hostname, port: uriObj.port})
     );
     this._socket.setEncoding('utf-8');
 
