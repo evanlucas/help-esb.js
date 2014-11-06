@@ -4,7 +4,7 @@
   "description": "A client for our ESB.",
   "main": "help-esb.js",
   "author": "Help.com",
-  "license": "proprietary",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git://github.com/helpdotcom/help-esb.js.git"
