@@ -168,7 +168,7 @@
 
       result.then(function(data) {
         return this._send(
-          {meta: meta, data: _.extend({result: 'SUCCESS', data)}
+          {meta: meta, data: _.extend({result: 'SUCCESS'}, data)}
         );
       }.bind(this)).catch(function(error) {
         return this._send(
