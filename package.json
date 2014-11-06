@@ -1,7 +1,7 @@
 {
   "name": "help-esb",
   "version": "0.1.0",
-  "description": "A client for our ESB.",
+  "description": "A client for the Help.com team's ESB.",
   "main": "help-esb.js",
   "author": "Help.com",
   "license": "MIT",
