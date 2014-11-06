@@ -179,6 +179,12 @@
     }.bind(this));
   };
 
+  // ### HelpEsb.Client.close
+  // Closes the connection, ending communication.
+  HelpEsb.Client.prototype.close = function() {
+    this._socket.end();
+  }
+
   // ---
   // ### Private Methods
 
