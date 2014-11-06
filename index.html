@@ -300,7 +300,8 @@ received by the ESB or by any subscribers.  For RPC-esque behavior, use
 for a response from some other service.  This uses the autogen message id
 and relies on the other service properly publishing a message with a
 proper replyTo.</p>
-<pre><code>client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>}).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
+<pre><code>client.subscribe(<span class="hljs-string">'foo-result'</span>);
+client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>}).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
   <span class="hljs-built_in">console</span>.log(response);
 }).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
   <span class="hljs-built_in">console</span>.error(error);
@@ -405,9 +406,14 @@ ESB.
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-18">&#182;</a>
               </div>
-              <hr>
+              <h3 id="helpesb-client-close">HelpEsb.Client.close</h3>
+<p>Closes the connection, ending communication.</p>
 
             </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.close = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">this</span>._socket.end();
+  }</pre></div></div>
             
         </li>
         
@@ -418,7 +424,7 @@ ESB.
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-19">&#182;</a>
               </div>
-              <h3 id="private-methods">Private Methods</h3>
+              <hr>
 
             </div>
             
@@ -431,6 +437,19 @@ ESB.
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-20">&#182;</a>
               </div>
+              <h3 id="private-methods">Private Methods</h3>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
               <p>Format the packet for the ESB and send it over the socket.  JSON encodes
 the message and appends a newline as the delimiter between messages.</p>
 
@@ -442,11 +461,11 @@ the message and appends a newline as the delimiter between messages.</p>
         </li>
         
         
-        <li id="section-21">
+        <li id="section-22">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-21">&#182;</a>
+                <a class="pilcrow" href="#section-22">&#182;</a>
               </div>
               <p>Register a callback for replies to this message if a callback is given.</p>
 
@@ -462,11 +481,11 @@ the message and appends a newline as the delimiter between messages.</p>
         </li>
         
         
-        <li id="section-22">
+        <li id="section-23">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-22">&#182;</a>
+                <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
               <p>Sends the packet like <strong>_send</strong>, but returns a promise for a response from
 some other service.  This uses the autogen message id and relies on the
@@ -482,11 +501,11 @@ other service properly publishing a message with a proper replyTo.</p>
         </li>
         
         
-        <li id="section-23">
+        <li id="section-24">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-23">&#182;</a>
+                <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
               <p>Checks an RPC response and fails the promise if the response is not
 successful.</p>
@@ -504,11 +523,11 @@ successful.</p>
         </li>
         
         
-        <li id="section-24">
+        <li id="section-25">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-24">&#182;</a>
+                <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
               <p>Wait on the socket connection and once it is avaialable send the given
 string data returning a promise of the data being sent.</p>
@@ -524,11 +543,11 @@ string data returning a promise of the data being sent.</p>
         </li>
         
         
-        <li id="section-25">
+        <li id="section-26">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-25">&#182;</a>
+                <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <p>Returns the promise of authentication if the user has already subscribed,
 otherwise it just subscribes to nothing in order to at least authenticate.</p>
@@ -542,11 +561,11 @@ otherwise it just subscribes to nothing in order to at least authenticate.</p>
         </li>
         
         
-        <li id="section-26">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-26">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>Handle an incoming slice of data over the socket.  Split the message on
 the newline delimiters and pass each complete packet to <code>_handlePacket</code>.</p>
@@ -558,11 +577,11 @@ the newline delimiters and pass each complete packet to <code>_handlePacket</cod
         </li>
         
         
-        <li id="section-27">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <p>Continue to append to the buffer.  The full message may not come in one
 piece.</p>
@@ -575,11 +594,11 @@ piece.</p>
         </li>
         
         
-        <li id="section-28">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <p>It is even possible that multiple packets were sent at once and so we
 need to make sure we parse all of them.</p>
@@ -591,11 +610,11 @@ need to make sure we parse all of them.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <p>The section after the last newline (which may be empty) is kept in the
 buffer as it belongs to the next packet.</p>
@@ -611,11 +630,11 @@ buffer as it belongs to the next packet.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Handles a single packet of data.  The data is expected to be JSON, and if
 it isn’t, an error will be triggered through the event handler.
@@ -652,11 +671,11 @@ payload packets.</p>
         </li>
         
         
-        <li id="section-31">
+        <li id="section-32">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-32">&#182;</a>
               </div>
               <p>Process the packet to ensure it conforms to the ESB requirements.  Sets
 the message id in the metadata for the packet if it wasn’t already set.</p>
