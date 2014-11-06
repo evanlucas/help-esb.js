@@ -119,6 +119,7 @@
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
   //
+  //     client.subscribe('foo-result');
   //     client.rpcSend('foo', {name: 'John'}).then(function(response) {
   //       console.log(response);
   //     }).catch(function(error) {
