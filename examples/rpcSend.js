@@ -11,7 +11,7 @@ client.rpcSend('rpc-test', {name: 'nubs'})
   }).catch(function(error) {
     console.warn('Received error:');
     console.warn(error);
-  });
+  }).finally(client.close.bind(client));
 
 client.on('type.error', function(err) {
   console.warn('Oh noes!');

@@ -119,6 +119,7 @@
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
   //
+  //     client.subscribe('foo-result');
   //     client.rpcSend('foo', {name: 'John'}).then(function(response) {
   //       console.log(response);
   //     }).catch(function(error) {
@@ -177,6 +178,12 @@
       }.bind(this));
     }.bind(this));
   };
+
+  // ### HelpEsb.Client.close
+  // Closes the connection, ending communication.
+  HelpEsb.Client.prototype.close = function() {
+    this._socket.end();
+  }
 
   // ---
   // ### Private Methods
