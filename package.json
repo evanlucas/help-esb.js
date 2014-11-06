@@ -1,10 +1,14 @@
 {
   "name": "help-esb",
-  "version": "0.1.0",
-  "description": "A client for our ESB.",
+  "version": "0.1.1",
+  "description": "A client for the Help.com team's ESB.",
   "main": "help-esb.js",
   "author": "Help.com",
-  "license": "proprietary",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/helpdotcom/help-esb.js.git"
+  },
   "dependencies": {
     "bluebird": "~2.3",
     "lodash": "~2.4",

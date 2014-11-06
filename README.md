@@ -1,5 +1,5 @@
 # help-esb.js
-A Node.js client for our ESB.
+A Node.js client for the Help.com team's ESB.
 
 ## Usage
 Take a look at the [docco][docco]-generated [docs][docs] or the
