@@ -52,11 +52,12 @@ means this only works on Node.js, but meh.</p>
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'net'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'events'</span>).EventEmitter,
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'util'</span>),
+    <span class="hljs-built_in">require</span>(<span class="hljs-string">'url'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'bluebird'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'uuid'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'lodash'</span>)
   );
-}(<span class="hljs-keyword">this</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(HelpEsb, net, EventEmitter, util, Promise, uuid, _)</span> </span>{
+}(<span class="hljs-keyword">this</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(HelpEsb, net, EventEmitter, util, url, Promise, uuid, _)</span> </span>{
 <span class="hljs-pi">  'use strict'</span>;</pre></div></div>
             
         </li>
@@ -86,7 +87,7 @@ means this only works on Node.js, but meh.</p>
 need to <a href="#helpesb-client-login">login</a> and
 <a href="#helpesb-client-subscribe">subscribe</a> before doing anything over the
 connection.</p>
-<pre><code><span class="hljs-keyword">var</span> client = Esb.Client(<span class="hljs-string">'example.com'</span>, <span class="hljs-number">1234</span>);
+<pre><code><span class="hljs-keyword">var</span> client = Esb.Client(<span class="hljs-string">'tcp://example.com:1234'</span>);
 client.login(<span class="hljs-string">'clientName'</span>);
 client.subscribe(<span class="hljs-string">'subscriptionChannel1'</span>);
 client.on(<span class="hljs-string">'type.error'</span>, <span class="hljs-built_in">console</span>.error);
@@ -96,7 +97,7 @@ client.on(<span class="hljs-string">'group.subscriptionChannel1'</span>, <span c
 </code></pre>
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(host, port)</span> </span>{</pre></div></div>
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(uri)</span> </span>{</pre></div></div>
             
         </li>
         
@@ -111,7 +112,9 @@ client.on(<span class="hljs-string">'group.subscriptionChannel1'</span>, <span c
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    EventEmitter.call(<span class="hljs-keyword">this</span>);</pre></div></div>
+            <div class="content"><div class='highlight'><pre>    EventEmitter.call(<span class="hljs-keyword">this</span>);
+
+    <span class="hljs-keyword">var</span> uriObj = url.parse(uri);</pre></div></div>
             
         </li>
         
@@ -128,7 +131,7 @@ here as we shouldn’t really use anything else.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._socket = Promise.promisifyAll(
-      net.createConnection({host: host, port: port})
+      net.createConnection({host: uriObj.hostname, port: uriObj.port})
     );
     <span class="hljs-keyword">this</span>._socket.setEncoding(<span class="hljs-string">'utf-8'</span>);</pre></div></div>
             
@@ -383,7 +386,7 @@ ESB.
 
       result.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
         <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
-          {meta: meta, data: _.extend({result: <span class="hljs-string">'SUCCESS'</span>, data)}
+          {meta: meta, data: _.extend({result: <span class="hljs-string">'SUCCESS'</span>}, data)}
         );
       }.bind(<span class="hljs-keyword">this</span>)).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
         <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
