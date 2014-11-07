@@ -387,11 +387,14 @@ ESB.
 
       result.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
         <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
-          {meta: meta, data: _.extend({result: <span class="hljs-string">'SUCCESS'</span>}, data)}
+          {meta: _.extend({result: <span class="hljs-string">'SUCCESS'</span>}, meta), data: data}
         );
       }.bind(<span class="hljs-keyword">this</span>)).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
         <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
-          {meta: meta, data: {result: <span class="hljs-string">'FAILURE'</span>, reason: error}}
+          {
+            meta: _.extend({result: <span class="hljs-string">'FAILURE'</span>, reason: error}, meta),
+            data: data
+          }
         );
       }.bind(<span class="hljs-keyword">this</span>));
     }.bind(<span class="hljs-keyword">this</span>));
@@ -512,12 +515,12 @@ successful.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._checkRpcResult = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
-    <span class="hljs-keyword">if</span> (response.result !== <span class="hljs-string">'SUCCESS'</span>) {
-      <span class="hljs-keyword">return</span> Promise.reject(response);
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._checkRpcResult = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, meta)</span> </span>{
+    <span class="hljs-keyword">if</span> (meta.result !== <span class="hljs-string">'SUCCESS'</span>) {
+      <span class="hljs-keyword">return</span> Promise.reject(meta.reason);
     }
 
-    <span class="hljs-keyword">return</span> Promise.resolve(response);
+    <span class="hljs-keyword">return</span> Promise.resolve(data);
   };</pre></div></div>
             
         </li>
