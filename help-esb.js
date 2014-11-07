@@ -169,11 +169,14 @@
 
       result.then(function(data) {
         return this._send(
-          {meta: meta, data: _.extend({result: 'SUCCESS'}, data)}
+          {meta: _.extend({result: 'SUCCESS'}, meta), data: data}
         );
       }.bind(this)).catch(function(error) {
         return this._send(
-          {meta: meta, data: {result: 'FAILURE', reason: error}}
+          {
+            meta: _.extend({result: 'FAILURE', reason: error}, meta),
+            data: data
+          }
         );
       }.bind(this));
     }.bind(this));
@@ -211,12 +214,12 @@
 
   // Checks an RPC response and fails the promise if the response is not
   // successful.
-  HelpEsb.Client.prototype._checkRpcResult = function(response) {
-    if (response.result !== 'SUCCESS') {
-      return Promise.reject(response);
+  HelpEsb.Client.prototype._checkRpcResult = function(data, meta) {
+    if (meta.result !== 'SUCCESS') {
+      return Promise.reject(meta.reason);
     }
 
-    return Promise.resolve(response);
+    return Promise.resolve(data);
   };
 
   // Wait on the socket connection and once it is avaialable send the given
