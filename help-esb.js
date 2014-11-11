@@ -98,7 +98,7 @@
 
   // ### HelpEsb.Client.send
   // Sends a payload message to the ESB with the given data.  Returns a promise
-  // that,, like the [subscribe](#helpesb-client-subscribe) call, is fulfilled
+  // that, like the [subscribe](#helpesb-client-subscribe) call, is fulfilled
   // when the message is sent, but does not indicate whether the message was
   // received by the ESB or by any subscribers.  For RPC-esque behavior, use
   // [rpcSend](#helpesb-client-rpcsend).
