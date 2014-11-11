@@ -256,9 +256,12 @@
   };
 
   // Handles a single packet of data.  The data is expected to be JSON, and if
-  // it isn't, an error will be triggered through the event handler.
-  // Otherwise, an event of the packet's "type" will be triggered with the
-  // packet data being passed.
+  // it isn't, a `type.error` event will be emitted.  Otherwise, an event for
+  // each of the meta fields (e.g., `type.error`, `group.someGroup`,
+  // `replyTo.SOME_ID`) will be emitted.
+  //
+  // In addition, non-error packets will be emitted to the `*` event and, if no
+  // listeners were fired for the packet, to the `*.unhandled` event.
   //
   // In the future, this will also be responsible for handling "special"
   // packets like heartbeats, etc. that are kept separate from the primary
@@ -280,9 +283,14 @@
       return;
     }
 
-    _.each(packet.meta, function(value, key) {
-      this.emit(key + '.' + value, packet.data, packet.meta);
+    var handled = _.map(packet.meta, function(value, key) {
+      return this.emit(key + '.' + value, packet.data, packet.meta);
     }.bind(this));
+
+    this.emit('*', packet.data, packet.meta);
+    if (!_.any(handled)) {
+      this.emit('*.unhandled', packet.data, packet.meta);
+    }
   };
 
   // Process the packet to ensure it conforms to the ESB requirements.  Sets
