@@ -20,8 +20,7 @@
 
   // ### HelpEsb.Client *constructor*
   // The client connects to the ESB running on the given host/port.  You will
-  // need to [login](#helpesb-client-login) and
-  // [subscribe](#helpesb-client-subscribe) before doing anything over the
+  // need to [login](#helpesb-client-login) before doing anything over the
   // connection.
   //
   //     var client = Esb.Client('tcp://example.com:1234');
@@ -30,6 +29,15 @@
   //     client.on('type.error', console.error);
   //     client.on('group.subscriptionChannel1', function(data) {
   //       // Process data
+  //     });
+  //
+  // Or using the RPC conventions:
+  //
+  //     var client = Esb.Client('tcp://example.com:1234');
+  //     client.login('clientName');
+  //     client.rpcReceive('subscriptionChannel1', function(data) {
+  //       // Process data
+  //       return result;
   //     });
   HelpEsb.Client = function(uri) {
     // Extend EventEmitter to handle events.
@@ -58,54 +66,58 @@
     // user's configured error handler.
     this._socket.on('error', this.emit.bind(this, 'type.error'));
 
-    // Start with empty credentials and no authentication.
-    this._credentials = {};
+    // Start with no authentication and no subscriptions.
     this._authentication = null;
+    this._subscriptions = {};
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);
 
   // ### HelpEsb.Client.login
-  // Set authentication credentials for use with the ESB.  Right now, this does
-  // not actually "login" to the ESB because that behavior is combined with the
-  // subscription behavior.  Once you subscribe or attempt to send a message,
-  // the login will be finalized.
+  // Login to the ESB using the given credentials (name only right now).
+  // Returns a promise that gets resolved when successfully logged in.  This
+  // same promise is kept internally as well for controlling when further
+  // requests can be sent.
   //
   //     client.login('clientName');
   HelpEsb.Client.prototype.login = function(name) {
-    this._credentials.name = name;
+    return this._authentication = this._rpcSend({
+      meta: {type: 'login'},
+      data: {name: name, subscriptions: []}
+    }).timeout(5000);
   };
 
   // ### HelpEsb.Client.subscribe
-  // Register with the ESB and subscribe to an ESB group.  This returns a
+  // Subscribe to an ESB group.  This returns a
   // [promise](https://github.com/petkaantonov/bluebird) of the send event so
-  // you can do additional tasks after the subscription has been sent.  Note
-  // that this currently only checks that the message was sent and so the
-  // promise does not indicate that the subscription was successful on the ESB.
+  // you can do additional tasks after the subscription has been sent.
   //
   //     client.subscribe('a').then(function() {
   //       console.log('Subscribed!');
   //     });
-  HelpEsb.Client.prototype.subscribe = function() {
-    return this._authentication = this._rpcSend({
-      meta: {type: 'login'},
-      data: _.extend(
-        this._credentials,
-        {subscriptions: Array.prototype.slice.call(arguments)}
-      )
-    }).timeout(5000);
+  HelpEsb.Client.prototype.subscribe = function(group) {
+    if (typeof this._subscriptions[group] === 'undefined') {
+      this._subscriptions[group] = this._authentication.then(function() {
+        return this._rpcSend({
+          meta: {type: 'subscribe'},
+          data: {channel: group}
+        }).timeout(5000);
+      }.bind(this));
+    }
+
+    return this._subscriptions[group];
   };
 
   // ### HelpEsb.Client.send
   // Sends a payload message to the ESB with the given data.  Returns a promise
-  // that,, like the [subscribe](#helpesb-client-subscribe) call, is fulfilled
+  // that, like the [subscribe](#helpesb-client-subscribe) call, is fulfilled
   // when the message is sent, but does not indicate whether the message was
   // received by the ESB or by any subscribers.  For RPC-esque behavior, use
   // [rpcSend](#helpesb-client-rpcsend).
   //
   //     client.send('target', {id: 1234, message: 'Hello!'});
   HelpEsb.Client.prototype.send = function(group, data, replyCallback) {
-    return this._authenticated().then(function() {
+    return this._authentication.then(function() {
       return this._send(
         {meta: {type: 'sendMessage', group: group}, data: data},
         replyCallback
@@ -119,7 +131,9 @@
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
   //
-  //     client.subscribe('foo-result');
+  // Automatically subscribes to the result group for you if not already
+  // subscribed.
+  //
   //     client.rpcSend('foo', {name: 'John'}).then(function(response) {
   //       console.log(response);
   //     }).catch(function(error) {
@@ -127,7 +141,9 @@
   //     });
   HelpEsb.Client.prototype.rpcSend = function(group, data) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(group, data).spread(this._checkRpcResult);
+    return this.subscribe(group + '-result').then(function() {
+      return send(group, data).spread(this._checkRpcResult);
+    }.bind(this));
   };
 
   // ### HelpEsb.Client.rpcReceive
@@ -135,22 +151,26 @@
   // given callback with any messages.  The value returned by the callback is
   // sent to the GROUPNAME-result group in reply to the incoming message.
   //
-  //     client.subscribe('foo');
+  // Automatically subscribes to the group for you if not already subscribed.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       return {greeting: 'Hello ' + (data.name || 'Stranger')};
   //     });
   //
   // If the callback returns a promise, the result of the promise is sent.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       return request.getAsync('http://www.google.com');
   //     });
   //
   // Errors are also handled and errors are sent as the "reason" through the
   // ESB.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       throw new Error('Not implemented!');
   //     });
   HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
+    this.subscribe(group);
     this.on('group.' + group, function(data, incomingMeta) {
       // Link up our reply to the incoming request but on the "result" group.
       var meta = {
@@ -228,12 +248,6 @@
     return this._socketConnection.then(function() {
       return this._socket.writeAsync(data);
     }.bind(this));
-  };
-
-  // Returns the promise of authentication if the user has already subscribed,
-  // otherwise it just subscribes to nothing in order to at least authenticate.
-  HelpEsb.Client.prototype._authenticated = function() {
-    return this._authentication || this.subscribe();
   };
 
   // Handle an incoming slice of data over the socket.  Split the message on

@@ -1,7 +1,6 @@
 var HelpEsb = require('../help-esb');
 var client = new HelpEsb.Client(process.env.ESB);
 client.login('rpcSend');
-client.subscribe('rpc-test-result');
 
 client.rpcSend('rpc-test', {name: 'nubs'})
   .timeout(5000)
