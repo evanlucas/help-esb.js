@@ -57,8 +57,9 @@
     // user's configured error handler.
     this._socket.on('error', this.emit.bind(this, 'type.error'));
 
-    // Start with no authentication.
+    // Start with no authentication and no subscriptions.
     this._authentication = null;
+    this._subscriptions = {};
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);
@@ -86,12 +87,16 @@
   //       console.log('Subscribed!');
   //     });
   HelpEsb.Client.prototype.subscribe = function(group) {
-    return this._authentication.then(function() {
-      return this._rpcSend({
-        meta: {type: 'subscribe'},
-        data: {channel: group}
-      }).timeout(5000);
-    }.bind(this));
+    if (typeof this._subscriptions[group] === 'undefined') {
+      this._subscriptions[group] = this._authentication.then(function() {
+        return this._rpcSend({
+          meta: {type: 'subscribe'},
+          data: {channel: group}
+        }).timeout(5000);
+      }.bind(this));
+    }
+
+    return this._subscriptions[group];
   };
 
   // ### HelpEsb.Client.send
