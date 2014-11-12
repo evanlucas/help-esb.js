@@ -30,6 +30,15 @@
   //     client.on('group.subscriptionChannel1', function(data) {
   //       // Process data
   //     });
+  //
+  // Or using the RPC conventions:
+  //
+  //     var client = Esb.Client('tcp://example.com:1234');
+  //     client.login('clientName');
+  //     client.rpcReceive('subscriptionChannel1', function(data) {
+  //       // Process data
+  //       return result;
+  //     });
   HelpEsb.Client = function(uri) {
     // Extend EventEmitter to handle events.
     EventEmitter.call(this);
@@ -122,7 +131,9 @@
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
   //
-  //     client.subscribe('foo-result');
+  // Automatically subscribes to the result group for you if not already
+  // subscribed.
+  //
   //     client.rpcSend('foo', {name: 'John'}).then(function(response) {
   //       console.log(response);
   //     }).catch(function(error) {
@@ -130,7 +141,9 @@
   //     });
   HelpEsb.Client.prototype.rpcSend = function(group, data) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return send(group, data).spread(this._checkRpcResult);
+    return this.subscribe(group + '-result').then(function() {
+      return send(group, data).spread(this._checkRpcResult);
+    }.bind(this));
   };
 
   // ### HelpEsb.Client.rpcReceive
@@ -138,22 +151,26 @@
   // given callback with any messages.  The value returned by the callback is
   // sent to the GROUPNAME-result group in reply to the incoming message.
   //
-  //     client.subscribe('foo');
+  // Automatically subscribes to the group for you if not already subscribed.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       return {greeting: 'Hello ' + (data.name || 'Stranger')};
   //     });
   //
   // If the callback returns a promise, the result of the promise is sent.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       return request.getAsync('http://www.google.com');
   //     });
   //
   // Errors are also handled and errors are sent as the "reason" through the
   // ESB.
+  //
   //     client.rpcReceive('foo', function(data) {
   //       throw new Error('Not implemented!');
   //     });
   HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
+    this.subscribe(group);
     this.on('group.' + group, function(data, incomingMeta) {
       // Link up our reply to the incoming request but on the "result" group.
       var meta = {
