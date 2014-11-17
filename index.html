@@ -84,8 +84,7 @@ means this only works on Node.js, but meh.</p>
               </div>
               <h3 id="helpesb-client-constructor-">HelpEsb.Client <em>constructor</em></h3>
 <p>The client connects to the ESB running on the given host/port.  You will
-need to <a href="#helpesb-client-login">login</a> and
-<a href="#helpesb-client-subscribe">subscribe</a> before doing anything over the
+need to <a href="#helpesb-client-login">login</a> before doing anything over the
 connection.</p>
 <pre><code><span class="hljs-keyword">var</span> client = Esb.Client(<span class="hljs-string">'tcp://example.com:1234'</span>);
 client.login(<span class="hljs-string">'clientName'</span>);
@@ -93,6 +92,13 @@ client.subscribe(<span class="hljs-string">'subscriptionChannel1'</span>);
 client.on(<span class="hljs-string">'type.error'</span>, <span class="hljs-built_in">console</span>.error);
 client.on(<span class="hljs-string">'group.subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
   <span class="hljs-comment">// Process data</span>
+});
+</code></pre><p>Or using the RPC conventions:</p>
+<pre><code><span class="hljs-keyword">var</span> client = Esb.Client(<span class="hljs-string">'tcp://example.com:1234'</span>);
+client.login(<span class="hljs-string">'clientName'</span>);
+client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+  <span class="hljs-comment">// Process data</span>
+  <span class="hljs-keyword">return</span> result;
 });
 </code></pre>
             </div>
@@ -195,12 +201,12 @@ user’s configured error handler.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-10">&#182;</a>
               </div>
-              <p>Start with empty credentials and no authentication.</p>
+              <p>Start with no authentication and no subscriptions.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._credentials = {};
-    <span class="hljs-keyword">this</span>._authentication = <span class="hljs-literal">null</span>;
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._authentication = <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">this</span>._subscriptions = {};
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);</pre></div></div>
@@ -215,16 +221,19 @@ user’s configured error handler.</p>
                 <a class="pilcrow" href="#section-11">&#182;</a>
               </div>
               <h3 id="helpesb-client-login">HelpEsb.Client.login</h3>
-<p>Set authentication credentials for use with the ESB.  Right now, this does
-not actually “login” to the ESB because that behavior is combined with the
-subscription behavior.  Once you subscribe or attempt to send a message,
-the login will be finalized.</p>
+<p>Login to the ESB using the given credentials (name only right now).
+Returns a promise that gets resolved when successfully logged in.  This
+same promise is kept internally as well for controlling when further
+requests can be sent.</p>
 <pre><code>client.login(<span class="hljs-string">'clientName'</span>);
 </code></pre>
             </div>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.login = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(name)</span> </span>{
-    <span class="hljs-keyword">this</span>._credentials.name = name;
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication = <span class="hljs-keyword">this</span>._rpcSend({
+      meta: {type: <span class="hljs-string">'login'</span>},
+      data: {name: name, subscriptions: []}
+    }).timeout(<span class="hljs-number">5000</span>);
   };</pre></div></div>
             
         </li>
@@ -237,25 +246,26 @@ the login will be finalized.</p>
                 <a class="pilcrow" href="#section-12">&#182;</a>
               </div>
               <h3 id="helpesb-client-subscribe">HelpEsb.Client.subscribe</h3>
-<p>Register with the ESB and subscribe to an ESB group.  This returns a
+<p>Subscribe to an ESB group.  This returns a
 <a href="https://github.com/petkaantonov/bluebird">promise</a> of the send event so
-you can do additional tasks after the subscription has been sent.  Note
-that this currently only checks that the message was sent and so the
-promise does not indicate that the subscription was successful on the ESB.</p>
+you can do additional tasks after the subscription has been sent.</p>
 <pre><code>client.subscribe(<span class="hljs-string">'a'</span>).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
   <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'Subscribed!'</span>);
 });
 </code></pre>
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.subscribe = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication = <span class="hljs-keyword">this</span>._rpcSend({
-      meta: {type: <span class="hljs-string">'login'</span>},
-      data: _.extend(
-        <span class="hljs-keyword">this</span>._credentials,
-        {subscriptions: <span class="hljs-built_in">Array</span>.prototype.slice.call(<span class="hljs-built_in">arguments</span>)}
-      )
-    }).timeout(<span class="hljs-number">5000</span>);
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.subscribe = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group)</span> </span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>._subscriptions[group] === <span class="hljs-string">'undefined'</span>) {
+      <span class="hljs-keyword">this</span>._subscriptions[group] = <span class="hljs-keyword">this</span>._authentication.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._rpcSend({
+          meta: {type: <span class="hljs-string">'subscribe'</span>},
+          data: {channel: group}
+        }).timeout(<span class="hljs-number">5000</span>);
+      }.bind(<span class="hljs-keyword">this</span>));
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._subscriptions[group];
   };</pre></div></div>
             
         </li>
@@ -269,7 +279,7 @@ promise does not indicate that the subscription was successful on the ESB.</p>
               </div>
               <h3 id="helpesb-client-send">HelpEsb.Client.send</h3>
 <p>Sends a payload message to the ESB with the given data.  Returns a promise
-that,, like the <a href="#helpesb-client-subscribe">subscribe</a> call, is fulfilled
+that, like the <a href="#helpesb-client-subscribe">subscribe</a> call, is fulfilled
 when the message is sent, but does not indicate whether the message was
 received by the ESB or by any subscribers.  For RPC-esque behavior, use
 <a href="#helpesb-client-rpcsend">rpcSend</a>.</p>
@@ -278,7 +288,7 @@ received by the ESB or by any subscribers.  For RPC-esque behavior, use
             </div>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, data, replyCallback)</span> </span>{
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authenticated().then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
       <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
         {meta: {type: <span class="hljs-string">'sendMessage'</span>, group: group}, data: data},
         replyCallback
@@ -300,8 +310,9 @@ received by the ESB or by any subscribers.  For RPC-esque behavior, use
 for a response from some other service.  This uses the autogen message id
 and relies on the other service properly publishing a message with a
 proper replyTo.</p>
-<pre><code>client.subscribe(<span class="hljs-string">'foo-result'</span>);
-client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>}).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
+<p>Automatically subscribes to the result group for you if not already
+subscribed.</p>
+<pre><code>client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>}).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
   <span class="hljs-built_in">console</span>.log(response);
 }).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
   <span class="hljs-built_in">console</span>.error(error);
@@ -311,7 +322,9 @@ client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, data)</span> </span>{
     <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype.send).bind(<span class="hljs-keyword">this</span>);
-    <span class="hljs-keyword">return</span> send(group, data).spread(<span class="hljs-keyword">this</span>._checkRpcResult);
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.subscribe(group + <span class="hljs-string">'-result'</span>).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+      <span class="hljs-keyword">return</span> send(group, data).spread(<span class="hljs-keyword">this</span>._checkRpcResult);
+    }.bind(<span class="hljs-keyword">this</span>));
   };</pre></div></div>
             
         </li>
@@ -327,23 +340,24 @@ client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-
 <p>Listen on the given group like <a href="#helpesb-client-on">on</a>, and call the
 given callback with any messages.  The value returned by the callback is
 sent to the GROUPNAME-result group in reply to the incoming message.</p>
-<pre><code>client.subscribe(<span class="hljs-string">'foo'</span>);
-client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+<p>Automatically subscribes to the group for you if not already subscribed.</p>
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
   <span class="hljs-keyword">return</span> {greeting: <span class="hljs-string">'Hello '</span> + (data.name || <span class="hljs-string">'Stranger'</span>)};
 });
-</code></pre><p>If the callback returns a promise, the result of the promise is sent.
-    client.rpcReceive(‘foo’, function(data) {
-      return request.getAsync(‘<a href="http://www.google.com">http://www.google.com</a>‘);
-    });</p>
-<p>Errors are also handled and errors are sent as the “reason” through the
-ESB.
-    client.rpcReceive(‘foo’, function(data) {
-      throw new Error(‘Not implemented!’);
-    });</p>
-
+</code></pre><p>If the callback returns a promise, the result of the promise is sent.</p>
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+  <span class="hljs-keyword">return</span> request.getAsync(<span class="hljs-string">'http://www.google.com'</span>);
+});
+</code></pre><p>Errors are also handled and errors are sent as the “reason” through the
+ESB.</p>
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+  <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Not implemented!'</span>);
+});
+</code></pre>
             </div>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcReceive = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, cb)</span> </span>{
+    <span class="hljs-keyword">this</span>.subscribe(group);
     <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, incomingMeta)</span> </span>{</pre></div></div>
             
         </li>
@@ -552,24 +566,6 @@ string data returning a promise of the data being sent.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
-              <p>Returns the promise of authentication if the user has already subscribed,
-otherwise it just subscribes to nothing in order to at least authenticate.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._authenticated = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication || <span class="hljs-keyword">this</span>.subscribe();
-  };</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-27">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
-              </div>
               <p>Handle an incoming slice of data over the socket.  Split the message on
 the newline delimiters and pass each complete packet to <code>_handlePacket</code>.</p>
 
@@ -580,11 +576,11 @@ the newline delimiters and pass each complete packet to <code>_handlePacket</cod
         </li>
         
         
-        <li id="section-28">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>Continue to append to the buffer.  The full message may not come in one
 piece.</p>
@@ -597,11 +593,11 @@ piece.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <p>It is even possible that multiple packets were sent at once and so we
 need to make sure we parse all of them.</p>
@@ -613,11 +609,11 @@ need to make sure we parse all of them.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <p>The section after the last newline (which may be empty) is kept in the
 buffer as it belongs to the next packet.</p>
@@ -633,16 +629,18 @@ buffer as it belongs to the next packet.</p>
         </li>
         
         
-        <li id="section-31">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <p>Handles a single packet of data.  The data is expected to be JSON, and if
-it isn’t, an error will be triggered through the event handler.
-Otherwise, an event of the packet’s “type” will be triggered with the
-packet data being passed.</p>
+it isn’t, a <code>type.error</code> event will be emitted.  Otherwise, an event for
+each of the meta fields (e.g., <code>type.error</code>, <code>group.someGroup</code>,
+<code>replyTo.SOME_ID</code>) will be emitted.</p>
+<p>In addition, non-error packets will be emitted to the <code>*</code> event and, if no
+listeners were fired for the packet, to the <code>*.unhandled</code> event.</p>
 <p>In the future, this will also be responsible for handling “special”
 packets like heartbeats, etc. that are kept separate from the primary
 payload packets.</p>
@@ -666,19 +664,24 @@ payload packets.</p>
       <span class="hljs-keyword">return</span>;
     }
 
-    _.each(packet.meta, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(value, key)</span> </span>{
-      <span class="hljs-keyword">this</span>.emit(key + <span class="hljs-string">'.'</span> + value, packet.data, packet.meta);
+    <span class="hljs-keyword">var</span> handled = _.map(packet.meta, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(value, key)</span> </span>{
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.emit(key + <span class="hljs-string">'.'</span> + value, packet.data, packet.meta);
     }.bind(<span class="hljs-keyword">this</span>));
+
+    <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*'</span>, packet.data, packet.meta);
+    <span class="hljs-keyword">if</span> (!_.any(handled)) {
+      <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*.unhandled'</span>, packet.data, packet.meta);
+    }
   };</pre></div></div>
             
         </li>
         
         
-        <li id="section-32">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Process the packet to ensure it conforms to the ESB requirements.  Sets
 the message id in the metadata for the packet if it wasn’t already set.</p>
