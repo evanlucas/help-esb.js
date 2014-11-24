@@ -43,32 +43,12 @@
     // Extend EventEmitter to handle events.
     EventEmitter.call(this);
 
-    var uriObj = url.parse(uri);
-    // This uses the basic socket connection to the ESB.  We are forcing utf-8
-    // here as we shouldn't really use anything else.
-    this._socket = Promise.promisifyAll(
-      net.createConnection({host: uriObj.hostname, port: uriObj.port})
-    );
-    this._socket.setEncoding('utf-8');
-
-    // We can't send anything over the socket until we have a connection.  We
-    // immediately initiate the connection and save a promise for it so that
-    // the client ensures the connection exists before trying to send data.
-    this._socketConnection = this._socket.onAsync('connect');
-
-    // Handle data coming in over the socket using our special handler.
-    // Because data can come in pieces, we have to keep a data buffer so that
-    // we only process complete payloads.
-    this._buffer = '';
-    this._socket.on('data', this._handleData.bind(this));
-
-    // Error handling is a bit simpler - we can just pass the error to the
-    // user's configured error handler.
-    this._socket.on('error', this.emit.bind(this, 'type.error'));
+    this._connect(uri);
 
     // Start with no authentication and no subscriptions.
     this._authentication = null;
     this._subscriptions = {};
+    this._login = null;
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);
@@ -81,6 +61,8 @@
   //
   //     client.login('clientName');
   HelpEsb.Client.prototype.login = function(name) {
+    this._login = name;
+
     return this._authentication = this._rpcSend({
       meta: {type: 'login'},
       data: {name: name, subscriptions: []}
@@ -206,11 +188,65 @@
   // Closes the connection, ending communication.
   HelpEsb.Client.prototype.close = function() {
     this.emit('socket.close');
+    this._socket.removeAllListeners('close');
     this._socket.end();
   }
 
   // ---
   // ### Private Methods
+
+  // Does the actual connecting and binds events onto the socket for handling
+  // data/error/close.
+  HelpEsb.Client.prototype._connect = function(uri) {
+    var uriObj = url.parse(uri);
+    // This uses the basic socket connection to the ESB.  We are forcing utf-8
+    // here as we shouldn't really use anything else.
+    this._socket = Promise.promisifyAll(
+      net.createConnection({host: uriObj.hostname, port: uriObj.port})
+    );
+    this._socket.setEncoding('utf-8');
+
+    // We can't send anything over the socket until we have a connection.  We
+    // immediately initiate the connection and save a promise for it so that
+    // the client ensures the connection exists before trying to send data.
+    this._socketConnection = this._socket.onAsync('connect');
+
+    // Handle data coming in over the socket using our special handler.
+    // Because data can come in pieces, we have to keep a data buffer so that
+    // we only process complete payloads.
+    this._buffer = '';
+    this._socket.on('data', this._handleData.bind(this));
+
+    // Error handling is a bit simpler - we can just pass the error to the
+    // user's configured error handler.
+    this._socket.on('error', this.emit.bind(this, 'type.error'));
+
+    this._socket.on('close', this._reconnect.bind(this, uri));
+  };
+
+  // This reconnects to the ESB and sets up the resubscription handler.
+  HelpEsb.Client.prototype._reconnect = function(uri) {
+    var previousSubscriptions = Object.keys(this._subscriptions);
+
+    this._socket.destroy();
+    this._connect(uri);
+
+    this._socket.on(
+      'connect',
+      this._resubscribe.bind(this, this._login, previousSubscriptions)
+    );
+  };
+
+  // Reauthenticates and resubscribes to the socket using the given data.
+  HelpEsb.Client.prototype._resubscribe = function(login, subscriptions) {
+    this._subscriptions = {};
+
+    if (login !== null) {
+      this.emit('socket.reconnect');
+      this.login(login);
+      subscriptions.forEach(this.subscribe, this);
+    }
+  }
 
   // Format the packet for the ESB and send it over the socket.  JSON encodes
   // the message and appends a newline as the delimiter between messages.
