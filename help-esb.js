@@ -84,7 +84,7 @@
     return this._authentication = this._rpcSend({
       meta: {type: 'login'},
       data: {name: name, subscriptions: []}
-    }).timeout(5000);
+    }).timeout(10000);
   };
 
   // ### HelpEsb.Client.subscribe
@@ -101,7 +101,7 @@
         return this._rpcSend({
           meta: {type: 'subscribe'},
           data: {channel: group}
-        }).timeout(5000);
+        }).timeout(10000);
       }.bind(this));
     }
 
