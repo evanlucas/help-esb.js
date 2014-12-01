@@ -239,6 +239,7 @@
 
   // Reauthenticates and resubscribes to the socket using the given data.
   HelpEsb.Client.prototype._resubscribe = function(login, subscriptions) {
+    this._authentication = null;
     this._subscriptions = {};
 
     if (login !== null) {
@@ -348,6 +349,14 @@
   // the message id in the metadata for the packet if it wasn't already set.
   HelpEsb.Client.prototype._massageOutboundPacket = function(packet) {
     packet.meta.id = packet.meta.id || uuid.v4();
+
+    if (
+      this._authentication !== null &&
+      this._authentication.isFulfilled() &&
+      typeof this._authentication.value().channelId !== 'undefined'
+    ) {
+      packet.meta.from = this._authentication.value().channelId;
+    }
 
     return packet;
   };
