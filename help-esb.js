@@ -350,6 +350,14 @@
   HelpEsb.Client.prototype._massageOutboundPacket = function(packet) {
     packet.meta.id = packet.meta.id || uuid.v4();
 
+    if (
+      this._authentication !== null &&
+      this._authentication.isFulfilled() &&
+      typeof this._authentication.value().channelId !== 'undefined'
+    ) {
+      packet.meta.from = this._authentication.value().channelId;
+    }
+
     return packet;
   };
 
