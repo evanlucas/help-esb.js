@@ -239,6 +239,7 @@
 
   // Reauthenticates and resubscribes to the socket using the given data.
   HelpEsb.Client.prototype._resubscribe = function(login, subscriptions) {
+    this._authentication = null;
     this._subscriptions = {};
 
     if (login !== null) {
