@@ -205,6 +205,7 @@
   // ### HelpEsb.Client.close
   // Closes the connection, ending communication.
   HelpEsb.Client.prototype.close = function() {
+    this.emit('socket.close');
     this._socket.end();
   }
 
