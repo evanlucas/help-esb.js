@@ -342,12 +342,21 @@
       return;
     }
 
-    var handled = _.map(packet.meta, function(value, key) {
+    // Emits key.value events with the data and meta.  If the value is an
+    // array, it iterates over the array and emits events on each value in the
+    // array.  Returns true if any of the events were handled.
+    var emitKeyValue = function(value, key) {
+      if (_.isArray(value)) {
+        return _.any(_.map(value, function(valueInner) {
+          return emitKeyValue(valueInner, key);
+        }));
+      }
+
       return this.emit(key + '.' + value, packet.data, packet.meta);
-    }.bind(this));
+    }.bind(this);
 
     this.emit('*', packet.data, packet.meta);
-    if (!_.any(handled)) {
+    if (!_.any(_.map(packet.meta, emitKeyValue))) {
       this.emit('*.unhandled', packet.data, packet.meta);
     }
   };
