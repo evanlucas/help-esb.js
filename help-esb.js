@@ -154,12 +154,15 @@
   HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
     this.subscribe(group);
     this.on('group.' + group, function(data, incomingMeta) {
+      var meta = {type: 'sendMessage', replyTo: incomingMeta.id};
+
       // Link up our reply to the incoming request but on the "result" group.
-      var meta = {
-        type: 'sendMessage',
-        group: group + '-result',
-        replyTo: incomingMeta.id
-      };
+      var groups = [group + '-result'];
+
+      // CC the groups in the incoming messages CC list.
+      if (incomingMeta.cc && typeof incomingMeta.cc.group !== 'undefined') {
+        groups = groups.concat(incomingMeta.cc.group);
+      }
 
       // Catch thrown errors so that we can send the result through the ESB.
       var result = null;
@@ -169,16 +172,20 @@
         result = Promise.reject(e.toString());
       }
 
+      var sendToGroup = function(meta, data, group) {
+        return this._send({meta: _.extend({group: group}, meta), data: data});
+      }.bind(this);
+
+      var sendToAll = function(meta, data) {
+        return Promise.all(groups.map(_.partial(sendToGroup, meta, data)));
+      };
+
       result.then(function(data) {
-        return this._send(
-          {meta: _.extend({result: 'SUCCESS'}, meta), data: data}
-        );
+        return sendToAll(_.extend({result: 'SUCCESS'}, meta), data);
       }.bind(this)).catch(function(error) {
-        return this._send(
-          {
-            meta: _.extend({result: 'FAILURE', reason: error}, meta),
-            data: data
-          }
+        return sendToAll(
+          _.extend({result: 'FAILURE', reason: error}, meta),
+          data
         );
       }.bind(this));
     }.bind(this));
