@@ -164,6 +164,10 @@
         groups = groups.concat(incomingMeta.cc.group);
       }
 
+      if (typeof incomingMeta.session !== 'undefined') {
+        meta.session = incomingMeta.session;
+      }
+
       // Catch thrown errors so that we can send the result through the ESB.
       var result = null;
       try {
