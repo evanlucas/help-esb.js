@@ -129,9 +129,9 @@
   };
 
   // ### HelpEsb.Client.rpcReceive
-  // Listen on the given group like [on](#helpesb-client-on), and call the
-  // given callback with any messages.  The value returned by the callback is
-  // sent to the GROUPNAME-result group in reply to the incoming message.
+  // Listen on the given group like **on**, and call the given callback with
+  // any messages.  The value returned by the callback is sent to the
+  // GROUPNAME-result group in reply to the incoming message.
   //
   // Automatically subscribes to the group for you if not already subscribed.
   //
