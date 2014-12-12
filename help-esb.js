@@ -176,7 +176,7 @@
         return Promise.all(groups.map(_.partial(sendToGroup, meta, data)));
       };
 
-      Promise.try(cb.bind({}, data)).then(function(data) {
+      Promise.try(cb.bind({}, data, incomingMeta)).then(function(data) {
         return sendToAll(_.extend({result: 'SUCCESS'}, meta), data);
       }.bind(this)).catch(function(error) {
         var reason = error instanceof Error ? error.toString() : error;
