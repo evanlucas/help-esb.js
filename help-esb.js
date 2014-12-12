@@ -164,12 +164,8 @@
         groups = groups.concat(incomingMeta.cc.group);
       }
 
-      // Catch thrown errors so that we can send the result through the ESB.
-      var result = null;
-      try {
-        result = Promise.resolve(cb(data));
-      } catch(e) {
-        result = Promise.reject(e.toString());
+      if (typeof incomingMeta.session !== 'undefined') {
+        meta.session = incomingMeta.session;
       }
 
       var sendToGroup = function(meta, data, group) {
@@ -180,11 +176,13 @@
         return Promise.all(groups.map(_.partial(sendToGroup, meta, data)));
       };
 
-      result.then(function(data) {
+      Promise.try(cb.bind({}, data, incomingMeta)).then(function(data) {
         return sendToAll(_.extend({result: 'SUCCESS'}, meta), data);
       }.bind(this)).catch(function(error) {
+        var reason = error instanceof Error ? error.toString() : error;
+
         return sendToAll(
-          _.extend({result: 'FAILURE', reason: error}, meta),
+          _.extend({result: 'FAILURE', reason: reason}, meta),
           data
         );
       }.bind(this));
