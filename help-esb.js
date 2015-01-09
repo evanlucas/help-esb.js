@@ -39,7 +39,7 @@
   //       // Process data
   //       return result;
   //     });
-  HelpEsb.Client = function(uri) {
+  HelpEsb.Client = function(uri, options) {
     // Extend EventEmitter to handle events.
     EventEmitter.call(this);
 
@@ -49,6 +49,7 @@
     this._authentication = null;
     this._subscriptions = {};
     this._login = null;
+    this._options = _.extend({debug: false}, options);
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);
@@ -288,6 +289,10 @@
   // Wait on the socket connection and once it is avaialable send the given
   // string data returning a promise of the data being sent.
   HelpEsb.Client.prototype._sendRaw = function(data) {
+    if (this._options.debug) {
+      console.log('help-esb SENDING', data);
+    }
+
     return this._socketConnection.then(function() {
       return this._socket.writeAsync(data);
     }.bind(this));
@@ -324,6 +329,10 @@
   // packets like heartbeats, etc. that are kept separate from the primary
   // payload packets.
   HelpEsb.Client.prototype._handlePacket = function(packet) {
+    if (this._options.debug) {
+      console.log('help-esb RECEIVED', packet);
+    }
+
     try {
       packet = JSON.parse(packet);
     } catch (e) {
