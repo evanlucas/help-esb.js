@@ -46,7 +46,7 @@
     this._connect(uri);
 
     // Start with no authentication and no subscriptions.
-    this._authentication = null;
+    this._authentication = Promise.reject('Attempted to send data through the ESB before authenticating');
     this._subscriptions = {};
     this._login = null;
     this._options = _.extend({debug: false}, options);
@@ -245,7 +245,7 @@
 
   // Reauthenticates and resubscribes to the socket using the given data.
   HelpEsb.Client.prototype._resubscribe = function(login, subscriptions) {
-    this._authentication = null;
+    this._authentication = Promise.reject('Attempted to send data through the ESB before authenticating');
     this._subscriptions = {};
 
     if (login !== null) {
