@@ -196,7 +196,7 @@
     this.emit('socket.close');
     this._socket.removeAllListeners('close');
     this._socket.end();
-  }
+  };
 
   // ---
   // ### Private Methods
@@ -253,7 +253,7 @@
       this.login(login);
       subscriptions.forEach(this.subscribe, this);
     }
-  }
+  };
 
   // Format the packet for the ESB and send it over the socket.  JSON encodes
   // the message and appends a newline as the delimiter between messages.
