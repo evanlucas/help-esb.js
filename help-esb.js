@@ -23,7 +23,7 @@
   // need to [login](#helpesb-client-login) before doing anything over the
   // connection.
   //
-  //     var client = Esb.Client('tcp://example.com:1234');
+  //     var client = new Esb.Client('tcp://example.com:1234');
   //     client.login('clientName');
   //     client.subscribe('subscriptionChannel1');
   //     client.on('type.error', console.error);
@@ -33,7 +33,7 @@
   //
   // Or using the RPC conventions:
   //
-  //     var client = Esb.Client('tcp://example.com:1234');
+  //     var client = new Esb.Client('tcp://example.com:1234');
   //     client.login('clientName');
   //     client.rpcReceive('subscriptionChannel1', function(data) {
   //       // Process data
