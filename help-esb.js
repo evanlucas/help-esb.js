@@ -46,7 +46,7 @@
     this._connect(uri);
 
     // Start with no authentication and no subscriptions.
-    this._authentication = Promise.reject('Attempted to send data through the ESB before authenticating');
+    this._authentication = null;
     this._subscriptions = {};
     this._login = null;
     this._options = _.extend({debug: false}, options);
@@ -80,7 +80,7 @@
   //     });
   HelpEsb.Client.prototype.subscribe = function(group) {
     if (typeof this._subscriptions[group] === 'undefined') {
-      this._subscriptions[group] = this._authentication.then(function() {
+      this._subscriptions[group] = this._authPromise().then(function() {
         return this._rpcSend({
           meta: {type: 'subscribe'},
           data: {channel: group}
@@ -100,7 +100,7 @@
   //
   //     client.send('target', {id: 1234, message: 'Hello!'});
   HelpEsb.Client.prototype.send = function(group, data, replyCallback) {
-    return this._authentication.then(function() {
+    return this._authPromise().then(function() {
       return this._send(
         {meta: {type: 'sendMessage', group: group}, data: data},
         replyCallback
@@ -245,7 +245,7 @@
 
   // Reauthenticates and resubscribes to the socket using the given data.
   HelpEsb.Client.prototype._resubscribe = function(login, subscriptions) {
-    this._authentication = Promise.reject('Attempted to send data through the ESB before authenticating');
+    this._authentication = null;
     this._subscriptions = {};
 
     if (login !== null) {
@@ -382,6 +382,13 @@
     }
 
     return packet;
+  };
+
+  // This will return a failed promise if authentication hasn't been attempted
+  // yet.
+  HelpEsb.Client.prototype._authPromise = function() {
+    return this._authentication ||
+      Promise.reject('Attempted to send data through the ESB before authenticating');
   };
 
   return HelpEsb;
