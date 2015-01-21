@@ -1,6 +1,6 @@
 var HelpEsb = require('../help-esb');
 var Promise = require('bluebird');
-var client = new HelpEsb.Client(process.env.ESB);
+var client = new HelpEsb.Client(process.env.ESB, {debug: true});
 client.login('rpcReceive');
 
 client.rpcReceive('rpc-test', function(data) {

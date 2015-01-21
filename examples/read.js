@@ -1,5 +1,5 @@
 var HelpEsb = require('../help-esb');
-var client = new HelpEsb.Client(process.env.ESB);
+var client = new HelpEsb.Client(process.env.ESB, {debug: true});
 client.login('foo');
 client.subscribe('asdf');
 
