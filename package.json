@@ -10,7 +10,7 @@
     "url": "git://github.com/helpdotcom/help-esb.js.git"
   },
   "dependencies": {
-    "bluebird": "~2.3",
+    "bluebird": "~2.9",
     "lodash": "~2.4",
     "uuid": "~2.0"
   },
