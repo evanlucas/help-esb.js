@@ -106,11 +106,23 @@
   // message was received by the ESB or by any subscribers.  For RPC-esque
   // behavior, use [rpcSend](#helpesb-client-rpcsend).
   //
+  // Optionally, you can also pass a second message instance that indicates
+  // which request message this message is in regards to.  This allows for
+  // following full request cycle reporting with the ESB.  We can track the
+  // requests down through multiple layers using this `inre` flag, and then the
+  // responses can come back up using `replyTo` and we can reconstruct the
+  // topography of the calls after the fact.
+  //
   //     client.send('target', {id: 1234, message: 'Hello!'});
-  HelpEsb.Client.prototype.send = function(group, message, replyCallback) {
+  HelpEsb.Client.prototype.send = function(
+    group,
+    message,
+    inre,
+    replyCallback
+  ) {
     return this._authPromise().then(function() {
       return this._send(
-        this.mb.send(group, this.mb.coerce(message)),
+        this.mb.send(group, this.mb.coerce(message), inre),
         replyCallback
       );
     }.bind(this));
@@ -131,10 +143,10 @@
   //       }).catch(function(error) {
   //         console.error(error);
   //       });
-  HelpEsb.Client.prototype.rpcSend = function(group, message) {
+  HelpEsb.Client.prototype.rpcSend = function(group, message, inre) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
     return this.subscribe(group + '-result').then(function() {
-      return send(group, message).then(this._checkRpcResult);
+      return send(group, message, inre).then(this._checkRpcResult);
     }.bind(this));
   };
 
@@ -431,8 +443,17 @@
   // ### HelpEsb.MessageBuilder.send
   // Creates a standard `sendMessage` message, extending off of the given
   // message.
-  HelpEsb.MessageBuilder.prototype.send = function(group, message) {
-    return this.extend({meta: {type: 'sendMessage', group: group}}, message);
+  HelpEsb.MessageBuilder.prototype.send = function(group, message, inre) {
+    return this.extend(
+      {
+        meta: {
+          type: 'sendMessage',
+          group: group,
+          inre: inre && inre.getMeta('id')
+        }
+      },
+      message
+    );
   };
 
   // ### HelpEsb.MessageBuilder.success
