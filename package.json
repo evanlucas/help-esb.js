@@ -1,6 +1,6 @@
 {
   "name": "help-esb",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A client for the Help.com team's ESB.",
   "main": "help-esb.js",
   "author": "Help.com",
@@ -12,6 +12,7 @@
   "dependencies": {
     "bluebird": "~2.9",
     "lodash": "~2.4",
+    "object-path": "~0.9.0",
     "uuid": "~2.0"
   },
   "devDependencies": {

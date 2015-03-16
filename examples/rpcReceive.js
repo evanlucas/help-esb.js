@@ -3,8 +3,8 @@ var Promise = require('bluebird');
 var client = new HelpEsb.Client(process.env.ESB, {debug: true});
 client.login('rpcReceive');
 
-client.rpcReceive('rpc-test', function(data) {
-  return {greeting: 'Hello ' + data.name};
+client.rpcReceive('rpc-test', function(message) {
+  return {greeting: 'Hello ' + message.get('name')};
 });
 
 client.on('type.error', function(err) {

@@ -4,9 +4,9 @@ client.login('rpcSend');
 
 client.rpcSend('rpc-test', {name: 'nubs'})
   .timeout(5000)
-  .then(function(response) {
+  .then(function(message) {
     console.log('Received response:');
-    console.log(response);
+    console.log(message.toJSON());
   }).catch(function(error) {
     console.warn('Received error:');
     console.warn(error);
