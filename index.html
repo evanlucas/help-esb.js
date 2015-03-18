@@ -55,9 +55,20 @@ means this only works on Node.js, but meh.</p>
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'url'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'bluebird'</span>),
     <span class="hljs-built_in">require</span>(<span class="hljs-string">'uuid'</span>),
-    <span class="hljs-built_in">require</span>(<span class="hljs-string">'lodash'</span>)
+    <span class="hljs-built_in">require</span>(<span class="hljs-string">'lodash'</span>),
+    <span class="hljs-built_in">require</span>(<span class="hljs-string">'object-path'</span>)
   );
-}(<span class="hljs-keyword">this</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(HelpEsb, net, EventEmitter, util, url, Promise, uuid, _)</span> </span>{
+}(<span class="hljs-keyword">this</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(
+  HelpEsb,
+  net,
+  EventEmitter,
+  util,
+  url,
+  Promise,
+  uuid,
+  _,
+  objectPath
+)</span> </span>{
 <span class="hljs-pi">  'use strict'</span>;</pre></div></div>
             
         </li>
@@ -90,14 +101,14 @@ connection.</p>
 client.login(<span class="hljs-string">'clientName'</span>);
 client.subscribe(<span class="hljs-string">'subscriptionChannel1'</span>);
 client.on(<span class="hljs-string">'type.error'</span>, <span class="hljs-built_in">console</span>.error);
-client.on(<span class="hljs-string">'group.subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-  <span class="hljs-comment">// Process data</span>
+client.on(<span class="hljs-string">'group.subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+  <span class="hljs-comment">// Process message</span>
 });
 </code></pre><p>Or using the RPC conventions:</p>
 <pre><code><span class="hljs-keyword">var</span> client = <span class="hljs-keyword">new</span> Esb.Client(<span class="hljs-string">'tcp://example.com:1234'</span>);
 client.login(<span class="hljs-string">'clientName'</span>);
-client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-  <span class="hljs-comment">// Process data</span>
+client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+  <span class="hljs-comment">// Process message</span>
   <span class="hljs-keyword">return</span> result;
 });
 </code></pre>
@@ -139,6 +150,8 @@ client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span
     <span class="hljs-keyword">this</span>._subscriptions = {};
     <span class="hljs-keyword">this</span>._login = <span class="hljs-literal">null</span>;
     <span class="hljs-keyword">this</span>._options = _.extend({debug: <span class="hljs-literal">false</span>}, options);
+
+    <span class="hljs-keyword">this</span>.mb = <span class="hljs-keyword">new</span> HelpEsb.MessageBuilder(<span class="hljs-keyword">this</span>);
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);</pre></div></div>
@@ -164,10 +177,8 @@ requests can be sent.</p>
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.login = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(name)</span> </span>{
     <span class="hljs-keyword">this</span>._login = name;
 
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication = <span class="hljs-keyword">this</span>._rpcSend({
-      meta: {type: <span class="hljs-string">'login'</span>},
-      data: {name: name, subscriptions: []}
-    }).timeout(<span class="hljs-number">10000</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication = <span class="hljs-keyword">this</span>._rpcSend(<span class="hljs-keyword">this</span>.mb.login(name))
+      .timeout(<span class="hljs-number">10000</span>);
   };</pre></div></div>
             
         </li>
@@ -192,10 +203,7 @@ you can do additional tasks after the subscription has been sent.</p>
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.subscribe = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group)</span> </span>{
     <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>._subscriptions[group] === <span class="hljs-string">'undefined'</span>) {
       <span class="hljs-keyword">this</span>._subscriptions[group] = <span class="hljs-keyword">this</span>._authPromise().then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._rpcSend({
-          meta: {type: <span class="hljs-string">'subscribe'</span>},
-          data: {channel: group}
-        }).timeout(<span class="hljs-number">10000</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._rpcSend(<span class="hljs-keyword">this</span>.mb.subscribe(group)).timeout(<span class="hljs-number">10000</span>);
       }.bind(<span class="hljs-keyword">this</span>));
     }
 
@@ -212,19 +220,30 @@ you can do additional tasks after the subscription has been sent.</p>
                 <a class="pilcrow" href="#section-9">&#182;</a>
               </div>
               <h3 id="helpesb-client-send">HelpEsb.Client.send</h3>
-<p>Sends a payload message to the ESB with the given data.  Returns a promise
-that, like the <a href="#helpesb-client-subscribe">subscribe</a> call, is fulfilled
-when the message is sent, but does not indicate whether the message was
-received by the ESB or by any subscribers.  For RPC-esque behavior, use
-<a href="#helpesb-client-rpcsend">rpcSend</a>.</p>
+<p>Sends a payload message to the ESB with the given message.  Returns a
+promise that, like the <a href="#helpesb-client-subscribe">subscribe</a> call, is
+fulfilled when the message is sent, but does not indicate whether the
+message was received by the ESB or by any subscribers.  For RPC-esque
+behavior, use <a href="#helpesb-client-rpcsend">rpcSend</a>.</p>
+<p>Optionally, you can also pass a second message instance that indicates
+which request message this message is in regards to.  This allows for
+following full request cycle reporting with the ESB.  We can track the
+requests down through multiple layers using this <code>inre</code> flag, and then the
+responses can come back up using <code>replyTo</code> and we can reconstruct the
+topography of the calls after the fact.</p>
 <pre><code>client.send(<span class="hljs-string">'target'</span>, {id: <span class="hljs-number">1234</span>, message: <span class="hljs-string">'Hello!'</span>});
 </code></pre>
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, data, replyCallback)</span> </span>{
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(
+    group,
+    message,
+    inre,
+    replyCallback
+  )</span> </span>{
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authPromise().then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
       <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(
-        {meta: {type: <span class="hljs-string">'sendMessage'</span>, group: group}, data: data},
+        <span class="hljs-keyword">this</span>.mb.send(group, <span class="hljs-keyword">this</span>.mb.coerce(message), inre),
         replyCallback
       );
     }.bind(<span class="hljs-keyword">this</span>));
@@ -246,18 +265,19 @@ and relies on the other service properly publishing a message with a
 proper replyTo.</p>
 <p>Automatically subscribes to the result group for you if not already
 subscribed.</p>
-<pre><code>client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>}).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
-  <span class="hljs-built_in">console</span>.log(response);
-}).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
-  <span class="hljs-built_in">console</span>.error(error);
-});
+<pre><code>client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>})
+  .then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
+    <span class="hljs-built_in">console</span>.log(response.toJSON());
+  }).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
+    <span class="hljs-built_in">console</span>.error(error);
+  });
 </code></pre>
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, data)</span> </span>{
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, message, inre)</span> </span>{
     <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype.send).bind(<span class="hljs-keyword">this</span>);
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.subscribe(group + <span class="hljs-string">'-result'</span>).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-      <span class="hljs-keyword">return</span> send(group, data).spread(<span class="hljs-keyword">this</span>._checkRpcResult);
+      <span class="hljs-keyword">return</span> send(group, message, inre).then(<span class="hljs-keyword">this</span>._checkRpcResult);
     }.bind(<span class="hljs-keyword">this</span>));
   };</pre></div></div>
             
@@ -275,16 +295,16 @@ subscribed.</p>
 any messages.  The value returned by the callback is sent to the
 GROUPNAME-result group in reply to the incoming message.</p>
 <p>Automatically subscribes to the group for you if not already subscribed.</p>
-<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-  <span class="hljs-keyword">return</span> {greeting: <span class="hljs-string">'Hello '</span> + (data.name || <span class="hljs-string">'Stranger'</span>)};
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+  <span class="hljs-keyword">return</span> {greeting: <span class="hljs-string">'Hello '</span> + message.get(<span class="hljs-string">'name'</span>, <span class="hljs-string">'Stranger'</span>)};
 });
 </code></pre><p>If the callback returns a promise, the result of the promise is sent.</p>
-<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
   <span class="hljs-keyword">return</span> request.getAsync(<span class="hljs-string">'http://www.google.com'</span>);
 });
 </code></pre><p>Errors are also handled and errors are sent as the “reason” through the
 ESB.</p>
-<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
+<pre><code>client.rpcReceive(<span class="hljs-string">'foo'</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
   <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Not implemented!'</span>);
 });
 </code></pre>
@@ -292,8 +312,8 @@ ESB.</p>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcReceive = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, cb)</span> </span>{
     <span class="hljs-keyword">this</span>.subscribe(group);
-    <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, incomingMeta)</span> </span>{
-      <span class="hljs-keyword">var</span> meta = {type: <span class="hljs-string">'sendMessage'</span>, replyTo: incomingMeta.id};</pre></div></div>
+    <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+      <span class="hljs-keyword">var</span> meta = {type: <span class="hljs-string">'sendMessage'</span>, replyTo: message.getMeta(<span class="hljs-string">'id'</span>)};</pre></div></div>
             
         </li>
         
@@ -323,31 +343,33 @@ ESB.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (incomingMeta.cc &amp;&amp; <span class="hljs-keyword">typeof</span> incomingMeta.cc.group !== <span class="hljs-string">'undefined'</span>) {
-        groups = groups.concat(incomingMeta.cc.group);
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> (message.hasMeta(<span class="hljs-string">'cc.group'</span>)) {
+        groups = groups.concat(message.getMeta(<span class="hljs-string">'cc.group'</span>));
       }
 
-      <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> incomingMeta.session !== <span class="hljs-string">'undefined'</span>) {
-        meta.session = incomingMeta.session;
+      <span class="hljs-keyword">if</span> (message.hasMeta(<span class="hljs-string">'session'</span>)) {
+        meta.session = message.getMeta(<span class="hljs-string">'session'</span>);
       }
 
-      <span class="hljs-keyword">var</span> sendToGroup = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(meta, data, group)</span> </span>{
-        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send({meta: _.extend({group: group}, meta), data: data});
+      <span class="hljs-keyword">var</span> sendToGroup = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message, group)</span> </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._send(<span class="hljs-keyword">this</span>.mb.send(group, message));
       }.bind(<span class="hljs-keyword">this</span>);
 
-      <span class="hljs-keyword">var</span> sendToAll = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(meta, data)</span> </span>{
-        <span class="hljs-keyword">return</span> Promise.all(groups.map(_.partial(sendToGroup, meta, data)));
+      <span class="hljs-keyword">var</span> sendToAll = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+        <span class="hljs-keyword">return</span> Promise.all(groups.map(_.partial(sendToGroup, message)));
       };
 
-      Promise.try(cb.bind({}, data, incomingMeta)).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-        <span class="hljs-keyword">return</span> sendToAll(_.extend({result: <span class="hljs-string">'SUCCESS'</span>}, meta), data);
+      Promise.try(cb.bind({}, message)).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+        <span class="hljs-keyword">return</span> sendToAll(
+          <span class="hljs-keyword">this</span>.mb.success(
+            <span class="hljs-keyword">this</span>.mb.extend({meta: meta}, <span class="hljs-keyword">this</span>.mb.coerce(message))
+          )
+        );
       }.bind(<span class="hljs-keyword">this</span>)).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
         <span class="hljs-keyword">var</span> reason = error <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Error</span> ? error.toString() : error;
+        <span class="hljs-keyword">var</span> errorMeta = _.extend({reason: reason}, meta);
 
-        <span class="hljs-keyword">return</span> sendToAll(
-          _.extend({result: <span class="hljs-string">'FAILURE'</span>, reason: reason}, meta),
-          data
-        );
+        <span class="hljs-keyword">return</span> sendToAll(<span class="hljs-keyword">this</span>.mb.failure({meta: errorMeta}));
       }.bind(<span class="hljs-keyword">this</span>));
     }.bind(<span class="hljs-keyword">this</span>));
   };</pre></div></div>
@@ -381,9 +403,26 @@ ESB.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-15">&#182;</a>
               </div>
-              <hr>
+              <h3 id="helpesb-client-decoratemessage">HelpEsb.Client.decorateMessage</h3>
+<p>Formats the message with client-specific values needed by the ESB.  This
+includes the <code>from</code> key in the meta to reference the logged in client
+channel id.</p>
+<p>You probably don’t need to call this yourself as it is called by the
+<code>MessageBuilder</code>.</p>
 
             </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.decorateMessage = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">if</span> (
+      <span class="hljs-keyword">this</span>._authentication !== <span class="hljs-literal">null</span> &amp;&amp;
+      <span class="hljs-keyword">this</span>._authentication.isFulfilled() &amp;&amp;
+      <span class="hljs-keyword">this</span>._authentication.value().has(<span class="hljs-string">'channelId'</span>)
+    ) {
+      message.meta.from = <span class="hljs-keyword">this</span>._authentication.value().get(<span class="hljs-string">'channelId'</span>);
+    }
+
+    <span class="hljs-keyword">return</span> message;
+  };</pre></div></div>
             
         </li>
         
@@ -394,7 +433,7 @@ ESB.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-16">&#182;</a>
               </div>
-              <h3 id="private-methods">Private Methods</h3>
+              <hr>
 
             </div>
             
@@ -407,6 +446,19 @@ ESB.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-17">&#182;</a>
               </div>
+              <h3 id="private-methods">Private Methods</h3>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
               <p>Does the actual connecting and binds events onto the socket for handling
 data/error/close.</p>
 
@@ -418,11 +470,11 @@ data/error/close.</p>
         </li>
         
         
-        <li id="section-18">
+        <li id="section-19">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-18">&#182;</a>
+                <a class="pilcrow" href="#section-19">&#182;</a>
               </div>
               <p>This uses the basic socket connection to the ESB.  We are forcing utf-8
 here as we shouldn’t really use anything else.</p>
@@ -437,11 +489,11 @@ here as we shouldn’t really use anything else.</p>
         </li>
         
         
-        <li id="section-19">
+        <li id="section-20">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-19">&#182;</a>
+                <a class="pilcrow" href="#section-20">&#182;</a>
               </div>
               <p>We can’t send anything over the socket until we have a connection.  We
 immediately initiate the connection and save a promise for it so that
@@ -454,11 +506,11 @@ the client ensures the connection exists before trying to send data.</p>
         </li>
         
         
-        <li id="section-20">
+        <li id="section-21">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-20">&#182;</a>
+                <a class="pilcrow" href="#section-21">&#182;</a>
               </div>
               <p>Handle data coming in over the socket using our special handler.
 Because data can come in pieces, we have to keep a data buffer so that
@@ -472,11 +524,11 @@ we only process complete payloads.</p>
         </li>
         
         
-        <li id="section-21">
+        <li id="section-22">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-21">&#182;</a>
+                <a class="pilcrow" href="#section-22">&#182;</a>
               </div>
               <p>Error handling is a bit simpler - we can just pass the error to the
 user’s configured error handler.</p>
@@ -491,11 +543,11 @@ user’s configured error handler.</p>
         </li>
         
         
-        <li id="section-22">
+        <li id="section-23">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-22">&#182;</a>
+                <a class="pilcrow" href="#section-23">&#182;</a>
               </div>
               <p>This reconnects to the ESB and sets up the resubscription handler.</p>
 
@@ -516,11 +568,11 @@ user’s configured error handler.</p>
         </li>
         
         
-        <li id="section-23">
+        <li id="section-24">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-23">&#182;</a>
+                <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
               <p>Reauthenticates and resubscribes to the socket using the given data.</p>
 
@@ -540,39 +592,18 @@ user’s configured error handler.</p>
         </li>
         
         
-        <li id="section-24">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-24">&#182;</a>
-              </div>
-              <p>Format the packet for the ESB and send it over the socket.  JSON encodes
-the message and appends a newline as the delimiter between messages.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet, replyCallback)</span> </span>{
-    packet = <span class="hljs-keyword">this</span>._massageOutboundPacket(packet);</pre></div></div>
-            
-        </li>
-        
-        
         <li id="section-25">
             <div class="annotation">
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
-              <p>Register a callback for replies to this message if a callback is given.</p>
+              <p>Format the message for the ESB and send it over the socket.  JSON encodes
+the message and appends a newline as the delimiter between messages.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">if</span> (replyCallback) {
-      <span class="hljs-keyword">this</span>.once(<span class="hljs-string">'replyTo.'</span> + packet.meta.id, _.partial(replyCallback, <span class="hljs-literal">null</span>));
-    }
-
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._sendRaw(<span class="hljs-built_in">JSON</span>.stringify(packet) + <span class="hljs-string">'\n'</span>);
-  };</pre></div></div>
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message, replyCallback)</span> </span>{</pre></div></div>
             
         </li>
         
@@ -583,15 +614,18 @@ the message and appends a newline as the delimiter between messages.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
-              <p>Sends the packet like <strong>_send</strong>, but returns a promise for a response from
-some other service.  This uses the autogen message id and relies on the
-other service properly publishing a message with a proper replyTo.</p>
+              <p>Register a callback for replies to this message if a callback is given.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
-    <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype._send).bind(<span class="hljs-keyword">this</span>);
-    <span class="hljs-keyword">return</span> send(packet).spread(<span class="hljs-keyword">this</span>._checkRpcResult);
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">if</span> (replyCallback) {
+      <span class="hljs-keyword">this</span>.once(
+        <span class="hljs-string">'replyTo.'</span> + message.getMeta(<span class="hljs-string">'id'</span>),
+        _.partial(replyCallback, <span class="hljs-literal">null</span>)
+      );
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._sendRaw(<span class="hljs-built_in">JSON</span>.stringify(message) + <span class="hljs-string">'\n'</span>);
   };</pre></div></div>
             
         </li>
@@ -603,17 +637,15 @@ other service properly publishing a message with a proper replyTo.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
-              <p>Checks an RPC response and fails the promise if the response is not
-successful.</p>
+              <p>Sends the message like <strong>_send</strong>, but returns a promise for a response
+from some other service.  This uses the autogen message id and relies on
+the other service properly publishing a message with a proper replyTo.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._checkRpcResult = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, meta)</span> </span>{
-    <span class="hljs-keyword">if</span> (meta.result !== <span class="hljs-string">'SUCCESS'</span>) {
-      <span class="hljs-keyword">return</span> Promise.reject(meta.reason);
-    }
-
-    <span class="hljs-keyword">return</span> Promise.resolve(data);
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype._send).bind(<span class="hljs-keyword">this</span>);
+    <span class="hljs-keyword">return</span> send(message).then(<span class="hljs-keyword">this</span>._checkRpcResult);
   };</pre></div></div>
             
         </li>
@@ -625,19 +657,17 @@ successful.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
-              <p>Wait on the socket connection and once it is avaialable send the given
-string data returning a promise of the data being sent.</p>
+              <p>Checks an RPC response and fails the promise if the response is not
+successful.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._sendRaw = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data)</span> </span>{
-    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._options.debug) {
-      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'help-esb SENDING'</span>, data);
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._checkRpcResult = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">if</span> (message.getMeta(<span class="hljs-string">'result'</span>) !== <span class="hljs-string">'SUCCESS'</span>) {
+      <span class="hljs-keyword">return</span> Promise.reject(message.getMeta(<span class="hljs-string">'reason'</span>));
     }
 
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socketConnection.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socket.writeAsync(data);
-    }.bind(<span class="hljs-keyword">this</span>));
+    <span class="hljs-keyword">return</span> Promise.resolve(message);
   };</pre></div></div>
             
         </li>
@@ -649,6 +679,30 @@ string data returning a promise of the data being sent.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
+              <p>Wait on the socket connection and once it is avaialable send the given
+string packet returning a promise of the packet being sent.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._sendRaw = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._options.debug) {
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'help-esb SENDING'</span>, packet);
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socketConnection.then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._socket.writeAsync(packet);
+    }.bind(<span class="hljs-keyword">this</span>));
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
               <p>Handle an incoming slice of data over the socket.  Split the message on
 the newline delimiters and pass each complete packet to <code>_handlePacket</code>.</p>
 
@@ -659,11 +713,11 @@ the newline delimiters and pass each complete packet to <code>_handlePacket</cod
         </li>
         
         
-        <li id="section-30">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>Continue to append to the buffer.  The full message may not come in one
 piece.</p>
@@ -676,11 +730,11 @@ piece.</p>
         </li>
         
         
-        <li id="section-31">
+        <li id="section-32">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-32">&#182;</a>
               </div>
               <p>It is even possible that multiple packets were sent at once and so we
 need to make sure we parse all of them.</p>
@@ -692,11 +746,11 @@ need to make sure we parse all of them.</p>
         </li>
         
         
-        <li id="section-32">
+        <li id="section-33">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-33">&#182;</a>
               </div>
               <p>The section after the last newline (which may be empty) is kept in the
 buffer as it belongs to the next packet.</p>
@@ -712,15 +766,15 @@ buffer as it belongs to the next packet.</p>
         </li>
         
         
-        <li id="section-33">
+        <li id="section-34">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-33">&#182;</a>
+                <a class="pilcrow" href="#section-34">&#182;</a>
               </div>
-              <p>Handles a single packet of data.  The data is expected to be JSON, and if
-it isn’t, a <code>type.error</code> event will be emitted.  Otherwise, an event for
-each of the meta fields (e.g., <code>type.error</code>, <code>group.someGroup</code>,
+              <p>Handles a single packet of data.  The packet is expected to be JSON, and
+if it isn’t, a <code>type.error</code> event will be emitted.  Otherwise, an event
+for each of the meta fields (e.g., <code>type.error</code>, <code>group.someGroup</code>,
 <code>replyTo.SOME_ID</code>) will be emitted.</p>
 <p>In addition, non-error packets will be emitted to the <code>*</code> event and, if no
 listeners were fired for the packet, to the <code>*.unhandled</code> event.</p>
@@ -735,32 +789,28 @@ payload packets.</p>
       <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'help-esb RECEIVED'</span>, packet);
     }
 
+    <span class="hljs-keyword">var</span> message;
+
     <span class="hljs-keyword">try</span> {
-      packet = <span class="hljs-built_in">JSON</span>.parse(packet);
+      message = <span class="hljs-keyword">new</span> HelpEsb.Message(<span class="hljs-built_in">JSON</span>.parse(packet));
+      <span class="hljs-keyword">if</span> (!message.hasMeta(<span class="hljs-string">'type'</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Invalid format detected for packet'</span>);
+      }
     } <span class="hljs-keyword">catch</span> (e) {
       <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'type.error'</span>, e);
-      <span class="hljs-keyword">return</span>;
-    }
-
-    <span class="hljs-keyword">if</span> (
-      <span class="hljs-keyword">typeof</span> packet.meta !== <span class="hljs-string">'object'</span> ||
-      <span class="hljs-keyword">typeof</span> packet.meta.type !== <span class="hljs-string">'string'</span> ||
-      <span class="hljs-keyword">typeof</span> packet.data === <span class="hljs-string">'undefined'</span>
-    ) {
-      <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'type.error'</span>, <span class="hljs-string">'Invalid format detected for packet'</span>, packet);
       <span class="hljs-keyword">return</span>;
     }</pre></div></div>
             
         </li>
         
         
-        <li id="section-34">
+        <li id="section-35">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-34">&#182;</a>
+                <a class="pilcrow" href="#section-35">&#182;</a>
               </div>
-              <p>Emits key.value events with the data and meta.  If the value is an
+              <p>Emits key.value events with the message.  If the value is an
 array, it iterates over the array and emits events on each value in the
 array.  Returns true if any of the events were handled.</p>
 
@@ -773,41 +823,13 @@ array.  Returns true if any of the events were handled.</p>
         }));
       }
 
-      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.emit(key + <span class="hljs-string">'.'</span> + value, packet.data, packet.meta);
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.emit(key + <span class="hljs-string">'.'</span> + value, message);
     }.bind(<span class="hljs-keyword">this</span>);
 
-    <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*'</span>, packet.data, packet.meta);
-    <span class="hljs-keyword">if</span> (!_.any(_.map(packet.meta, emitKeyValue))) {
-      <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*.unhandled'</span>, packet.data, packet.meta);
+    <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*'</span>, message);
+    <span class="hljs-keyword">if</span> (!_.any(_.map(message.getMeta(), emitKeyValue))) {
+      <span class="hljs-keyword">this</span>.emit(<span class="hljs-string">'*.unhandled'</span>, message);
     }
-  };</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-35">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-35">&#182;</a>
-              </div>
-              <p>Process the packet to ensure it conforms to the ESB requirements.  Sets
-the message id in the metadata for the packet if it wasn’t already set.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._massageOutboundPacket = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(packet)</span> </span>{
-    packet.meta.id = packet.meta.id || uuid.v4();
-
-    <span class="hljs-keyword">if</span> (
-      <span class="hljs-keyword">this</span>._authentication !== <span class="hljs-literal">null</span> &amp;&amp;
-      <span class="hljs-keyword">this</span>._authentication.isFulfilled() &amp;&amp;
-      <span class="hljs-keyword">typeof</span> <span class="hljs-keyword">this</span>._authentication.value().channelId !== <span class="hljs-string">'undefined'</span>
-    ) {
-      packet.meta.from = <span class="hljs-keyword">this</span>._authentication.value().channelId;
-    }
-
-    <span class="hljs-keyword">return</span> packet;
   };</pre></div></div>
             
         </li>
@@ -827,6 +849,360 @@ yet.</p>
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype._authPromise = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._authentication ||
       Promise.reject(<span class="hljs-string">'Attempted to send data through the ESB before authenticating'</span>);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <h2 id="helpesb-messagebuilder">HelpEsb.MessageBuilder</h2>
+<p>The <code>MessageBuilder</code> is a helper object that can build a <code>HelpEsb.Message</code>
+according to standard message types.</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-constructor-">HelpEsb.MessageBuilder <em>constructor</em></h3>
+<p>Initializes the object with access to the <code>HelpEsb.Client</code> instance used
+to decorate messages further.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(client)</span> </span>{
+    <span class="hljs-keyword">this</span>._client = client;
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-login">HelpEsb.MessageBuilder.login</h3>
+<p>Creates a standard login message for the given client name.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.login = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(name)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> HelpEsb.Message({
+      meta: {type: <span class="hljs-string">'login'</span>},
+      data: {name: name, subscriptions: []}
+    });
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-40">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-40">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-subscribe">HelpEsb.MessageBuilder.subscribe</h3>
+<p>Creates a standard subscribe message for the given group name.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.subscribe = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.create({meta: {type: <span class="hljs-string">'subscribe'</span>}, data: {channel: group}});
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-41">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-41">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-send">HelpEsb.MessageBuilder.send</h3>
+<p>Creates a standard <code>sendMessage</code> message, extending off of the given
+message.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.send = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, message, inre)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.extend(
+      {
+        meta: {
+          type: <span class="hljs-string">'sendMessage'</span>,
+          group: group,
+          inre: inre &amp;&amp; inre.getMeta(<span class="hljs-string">'id'</span>)
+        }
+      },
+      message
+    );
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-42">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-42">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-success">HelpEsb.MessageBuilder.success</h3>
+<p>Creates a standard success message which has a result status, extending
+off of the given message.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.success = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.extend({meta: {result: <span class="hljs-string">'SUCCESS'</span>}}, message);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-43">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-43">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-failure">HelpEsb.MessageBuilder.failure</h3>
+<p>Creates a standard failure message which has a result status, extending
+off of the given message.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.failure = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.extend({meta: {result: <span class="hljs-string">'FAILURE'</span>}}, message);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-44">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-44">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-create">HelpEsb.MessageBuilder.create</h3>
+<p>Creates a <code>HelpEsb.Message</code> object that has been decorated by the client.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.create = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> HelpEsb.Message(<span class="hljs-keyword">this</span>._client.decorateMessage(message));
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-45">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-45">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-build">HelpEsb.MessageBuilder.build</h3>
+<p>Creates a <code>HelpEsb.Message</code> object that has been decorated by the client
+from its constituent data and meta parameters.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.build = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, meta)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.create({meta: meta || {}, data: data || {}});
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-46">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-46">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-coerce">HelpEsb.MessageBuilder.coerce</h3>
+<p>Coerces the passed argument into a message, returning it as is if it is a
+<code>HelpEsb.Message</code> object, or building it from its <code>data</code> (and optional
+<code>meta</code>) otherwise.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.coerce = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(data, meta)</span> </span>{
+    <span class="hljs-keyword">return</span> data <span class="hljs-keyword">instanceof</span> HelpEsb.Message ? data : <span class="hljs-keyword">this</span>.build(data, meta);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-47">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-47">&#182;</a>
+              </div>
+              <h3 id="helpesb-messagebuilder-extend">HelpEsb.MessageBuilder.extend</h3>
+<p>Extends a message (<code>Message</code> object or POJO) with other message(s).
+Returns a new message that is the combined data/meta parts from all of the
+passed message arguments.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.MessageBuilder.prototype.extend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(<span class="hljs-comment">/* object, extension */</span>)</span> </span>{
+    <span class="hljs-keyword">var</span> params = _.map(<span class="hljs-built_in">arguments</span>, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(arg)</span> </span>{
+      <span class="hljs-keyword">return</span> _.clone(arg <span class="hljs-keyword">instanceof</span> HelpEsb.Message ? arg.toJSON() : arg);
+    });
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.build(
+      _.extend.apply({}, [{}].concat(_.pluck(params, <span class="hljs-string">'data'</span>))),
+      _.extend.apply({}, [{}].concat(_.pluck(params, <span class="hljs-string">'meta'</span>)))
+    );
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-48">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-48">&#182;</a>
+              </div>
+              <h2 id="helpesb-message">HelpEsb.Message</h2>
+<p>A data object representing an ESB message.  Also provides some convenience
+methods.</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-49">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-49">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-constructor-">HelpEsb.Message <em>constructor</em></h3>
+<p>Initiates the message based on the given message object.  Initializes the
+meta and data fields appropriately, including adding a message id if one
+does not exist.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">this</span>._data = _.has(message, <span class="hljs-string">'data'</span>) ? message.data : {};
+    <span class="hljs-keyword">this</span>._meta = _.extend({id: uuid.v4()}, message.meta);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-50">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-50">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-get">HelpEsb.Message.get</h3>
+<p>Get the data property with the given dot-delimited path.  For example,</p>
+<pre><code>message = <span class="hljs-keyword">new</span> HelpEsb.Message({foo: {bar: <span class="hljs-string">'baz'</span>}});
+message.get(<span class="hljs-string">'foo.bar'</span>) === <span class="hljs-string">'baz'</span>;
+</code></pre><p>You can also provide a default value to return instead of <code>undefined</code> for
+values that don’t exist.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message.prototype.get = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(path, def)</span> </span>{
+    <span class="hljs-keyword">return</span> objectPath.get(<span class="hljs-keyword">this</span>._data, path, def);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-51">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-51">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-getmeta">HelpEsb.Message.getMeta</h3>
+<p>Like <a href="#helpesb-message-get">get</a>, but for the meta fields.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message.prototype.getMeta = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(path, def)</span> </span>{
+    <span class="hljs-keyword">return</span> objectPath.get(<span class="hljs-keyword">this</span>._meta, path, def);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-52">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-52">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-has">HelpEsb.Message.has</h3>
+<p>Checks for the existence of the data proper with the given dot-delimited
+path.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message.prototype.has = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(path)</span> </span>{
+    <span class="hljs-keyword">return</span> objectPath.has(<span class="hljs-keyword">this</span>._data, path);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-53">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-53">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-hasmeta">HelpEsb.Message.hasMeta</h3>
+<p>Like <a href="#helpesb-message-has">has</a>, but for the meta fields.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message.prototype.hasMeta = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(path)</span> </span>{
+    <span class="hljs-keyword">return</span> objectPath.has(<span class="hljs-keyword">this</span>._meta, path);
+  };</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-54">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-54">&#182;</a>
+              </div>
+              <h3 id="helpesb-message-tojson">HelpEsb.Message.toJSON</h3>
+<p>Converts the message into its canonical form for JSON serialization.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>  HelpEsb.Message.prototype.toJSON = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> {meta: <span class="hljs-keyword">this</span>._meta, data: <span class="hljs-keyword">this</span>._data};
   };
 
   <span class="hljs-keyword">return</span> HelpEsb;
