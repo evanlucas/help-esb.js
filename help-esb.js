@@ -495,15 +495,32 @@
   // Extends a message (`Message` object or POJO) with other message(s).
   // Returns a new message that is the combined data/meta parts from all of the
   // passed message arguments.
+  //
+  // The `data` extension has some special handling for arrays and other
+  // non-object data types.  If any of the messages have an array `data` field,
+  // then array concatentation is used to merge the messages together.  If any
+  // of the messages have other non-object `data` fields, then order-based
+  // precedence (last one wins) is used to return the `data` field unmodified
+  // from the last message with one.  For objects, standard _.extend behavior
+  // is used to merge the objects together.
   HelpEsb.MessageBuilder.prototype.extend = function(/* object, extension */) {
     var params = _.map(arguments, function(arg) {
       return _.clone(arg instanceof HelpEsb.Message ? arg.toJSON() : arg);
     });
 
-    return this.build(
-      _.extend.apply({}, [{}].concat(_.pluck(params, 'data'))),
-      _.extend.apply({}, [{}].concat(_.pluck(params, 'meta')))
-    );
+    var newMeta = _.extend.apply({}, [{}].concat(_.pluck(params, 'meta')));
+    var data = _.reject(_.pluck(params, 'data'), _.isUndefined);
+    var arrayData = _.filter(data, _.isArray);
+    if (!_.isEmpty(arrayData)) {
+      return this.build(Array.prototype.concat.apply([], arrayData), newMeta);
+    }
+
+    var nonObjectData = _.reject(data, _.isObject);
+    if (!_.isEmpty(nonObjectData)) {
+      return this.build(_.last(nonObjectData), newMeta);
+    }
+
+    return this.build(_.extend.apply({}, [{}].concat(data)), newMeta);
   };
 
   // ## HelpEsb.Message
