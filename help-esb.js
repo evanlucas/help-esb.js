@@ -176,7 +176,11 @@
   HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
     this.subscribe(group);
     this.on('group.' + group, function(message) {
-      var meta = {type: 'sendMessage', replyTo: message.getMeta('id')};
+      var meta = {
+        type: 'sendMessage',
+        replyTo: message.getMeta('id'),
+        inre: message.getMeta('id')
+      };
 
       // Link up our reply to the incoming request but on the "result" group.
       var groups = [group + '-result'];
