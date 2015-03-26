@@ -313,7 +313,11 @@ ESB.</p>
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcReceive = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, cb)</span> </span>{
     <span class="hljs-keyword">this</span>.subscribe(group);
     <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
-      <span class="hljs-keyword">var</span> meta = {type: <span class="hljs-string">'sendMessage'</span>, replyTo: message.getMeta(<span class="hljs-string">'id'</span>)};</pre></div></div>
+      <span class="hljs-keyword">var</span> meta = {
+        type: <span class="hljs-string">'sendMessage'</span>,
+        replyTo: message.getMeta(<span class="hljs-string">'id'</span>),
+        inre: message.getMeta(<span class="hljs-string">'id'</span>)
+      };</pre></div></div>
             
         </li>
         
@@ -1060,6 +1064,13 @@ from its constituent data and meta parameters.</p>
 <p>Extends a message (<code>Message</code> object or POJO) with other message(s).
 Returns a new message that is the combined data/meta parts from all of the
 passed message arguments.</p>
+<p>The <code>data</code> extension has some special handling for arrays and other
+non-object data types.  If any of the messages have an array <code>data</code> field,
+then array concatentation is used to merge the messages together.  If any
+of the messages have other non-object <code>data</code> fields, then order-based
+precedence (last one wins) is used to return the <code>data</code> field unmodified
+from the last message with one.  For objects, standard _.extend behavior
+is used to merge the objects together.</p>
 
             </div>
             
@@ -1068,10 +1079,19 @@ passed message arguments.</p>
       <span class="hljs-keyword">return</span> _.clone(arg <span class="hljs-keyword">instanceof</span> HelpEsb.Message ? arg.toJSON() : arg);
     });
 
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.build(
-      _.extend.apply({}, [{}].concat(_.pluck(params, <span class="hljs-string">'data'</span>))),
-      _.extend.apply({}, [{}].concat(_.pluck(params, <span class="hljs-string">'meta'</span>)))
-    );
+    <span class="hljs-keyword">var</span> newMeta = _.extend.apply({}, [{}].concat(_.pluck(params, <span class="hljs-string">'meta'</span>)));
+    <span class="hljs-keyword">var</span> data = _.reject(_.pluck(params, <span class="hljs-string">'data'</span>), _.isUndefined);
+    <span class="hljs-keyword">var</span> arrayData = _.filter(data, _.isArray);
+    <span class="hljs-keyword">if</span> (!_.isEmpty(arrayData)) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.build(<span class="hljs-built_in">Array</span>.prototype.concat.apply([], arrayData), newMeta);
+    }
+
+    <span class="hljs-keyword">var</span> nonObjectData = _.reject(data, _.isObject);
+    <span class="hljs-keyword">if</span> (!_.isEmpty(nonObjectData)) {
+      <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.build(_.last(nonObjectData), newMeta);
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.build(_.extend.apply({}, [{}].concat(data)), newMeta);
   };</pre></div></div>
             
         </li>
