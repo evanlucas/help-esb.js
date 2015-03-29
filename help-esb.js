@@ -134,8 +134,9 @@
   // and relies on the other service properly publishing a message with a
   // proper replyTo.
   //
-  // Automatically subscribes to the result group for you if not already
-  // subscribed.
+  // Assumes that the calling service will send a reply back to your channel id
+  // so that you automatically get the reply.  If that's not the case, you may
+  // need to subscribe to the result channel.
   //
   //     client.rpcSend('foo', {name: 'John'})
   //       .then(function(response) {
@@ -145,9 +146,7 @@
   //       });
   HelpEsb.Client.prototype.rpcSend = function(group, message, inre) {
     var send = Promise.promisify(HelpEsb.Client.prototype.send).bind(this);
-    return this.subscribe(group + '-result').then(function() {
-      return send(group, message, inre).then(this._checkRpcResult);
-    }.bind(this));
+    return send(group, message, inre).then(this._checkRpcResult);
   };
 
   // ### HelpEsb.Client.rpcReceive
@@ -179,6 +178,7 @@
       var meta = {
         type: 'sendMessage',
         replyTo: message.getMeta('id'),
+        channel: message.getMeta('from'),
         inre: message.getMeta('id')
       };
 
