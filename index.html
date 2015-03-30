@@ -263,8 +263,9 @@ topography of the calls after the fact.</p>
 for a response from some other service.  This uses the autogen message id
 and relies on the other service properly publishing a message with a
 proper replyTo.</p>
-<p>Automatically subscribes to the result group for you if not already
-subscribed.</p>
+<p>Assumes that the calling service will send a reply back to your channel id
+so that you automatically get the reply.  If that’s not the case, you may
+need to subscribe to the result channel.</p>
 <pre><code>client.rpcSend(<span class="hljs-string">'foo'</span>, {name: <span class="hljs-string">'John'</span>})
   .then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(response)</span> </span>{
     <span class="hljs-built_in">console</span>.log(response.toJSON());
@@ -276,9 +277,7 @@ subscribed.</p>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcSend = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, message, inre)</span> </span>{
     <span class="hljs-keyword">var</span> send = Promise.promisify(HelpEsb.Client.prototype.send).bind(<span class="hljs-keyword">this</span>);
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.subscribe(group + <span class="hljs-string">'-result'</span>).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">()</span> </span>{
-      <span class="hljs-keyword">return</span> send(group, message, inre).then(<span class="hljs-keyword">this</span>._checkRpcResult);
-    }.bind(<span class="hljs-keyword">this</span>));
+    <span class="hljs-keyword">return</span> send(group, message, inre).then(<span class="hljs-keyword">this</span>._checkRpcResult);
   };</pre></div></div>
             
         </li>
@@ -316,6 +315,7 @@ ESB.</p>
       <span class="hljs-keyword">var</span> meta = {
         type: <span class="hljs-string">'sendMessage'</span>,
         replyTo: message.getMeta(<span class="hljs-string">'id'</span>),
+        channel: message.getMeta(<span class="hljs-string">'from'</span>),
         inre: message.getMeta(<span class="hljs-string">'id'</span>)
       };</pre></div></div>
             
