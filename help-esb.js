@@ -537,7 +537,10 @@
   // does not exist.
   HelpEsb.Message = function(message) {
     this._data = _.has(message, 'data') ? message.data : {};
-    this._meta = _.extend({id: uuid.v4()}, message.meta);
+    this._meta = _.extend(
+      {id: uuid.v4(), ts: Math.floor(Date.now() / 1000)},
+      message.meta
+    );
   };
 
   // ### HelpEsb.Message.get
