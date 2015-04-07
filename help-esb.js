@@ -209,7 +209,7 @@
           )
         );
       }.bind(this)).catch(function(error) {
-        var reason = error instanceof Error ? error.toString() : error;
+        var reason = _.isError(error) ? error.toString() : error;
         var errorMeta = _.extend({reason: reason}, meta);
 
         return sendToAll(this.mb.failure({meta: errorMeta}));
