@@ -111,7 +111,14 @@ client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span
   <span class="hljs-comment">// Process message</span>
   <span class="hljs-keyword">return</span> result;
 });
-</code></pre>
+</code></pre><p>Supported options:</p>
+<ul>
+<li><code>debug</code>: This logs messages to the console.</li>
+<li><code>newrelic</code>: This option can be set as an instance of the newrelic agent.
+RPC requests received by this client will be wrapped in a newrelic
+transaction named after the group.</li>
+</ul>
+
             </div>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(uri, options)</span> </span>{</pre></div></div>
@@ -149,7 +156,7 @@ client.rpcReceive(<span class="hljs-string">'subscriptionChannel1'</span>, <span
             <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._authentication = <span class="hljs-literal">null</span>;
     <span class="hljs-keyword">this</span>._subscriptions = {};
     <span class="hljs-keyword">this</span>._login = <span class="hljs-literal">null</span>;
-    <span class="hljs-keyword">this</span>._options = _.extend({debug: <span class="hljs-literal">false</span>}, options);
+    <span class="hljs-keyword">this</span>._options = _.extend({debug: <span class="hljs-literal">false</span>, newrelic: <span class="hljs-literal">null</span>}, options);
 
     <span class="hljs-keyword">this</span>.mb = <span class="hljs-keyword">new</span> HelpEsb.MessageBuilder(<span class="hljs-keyword">this</span>);
   };
@@ -310,8 +317,9 @@ ESB.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>  HelpEsb.Client.prototype.rpcReceive = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(group, cb)</span> </span>{
+    <span class="hljs-keyword">var</span> newrelic = <span class="hljs-keyword">this</span>._options.newrelic;
     <span class="hljs-keyword">this</span>.subscribe(group);
-    <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+    <span class="hljs-keyword">var</span> messageHandler = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
       <span class="hljs-keyword">var</span> meta = {
         type: <span class="hljs-string">'sendMessage'</span>,
         replyTo: message.getMeta(<span class="hljs-string">'id'</span>),
@@ -363,19 +371,53 @@ ESB.</p>
         <span class="hljs-keyword">return</span> Promise.all(groups.map(_.partial(sendToGroup, message)));
       };
 
-      Promise.try(cb.bind({}, message)).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
+      <span class="hljs-keyword">var</span> execute = Promise.try(cb.bind({}, message)).then(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(message)</span> </span>{
         <span class="hljs-keyword">return</span> sendToAll(
           <span class="hljs-keyword">this</span>.mb.success(
             <span class="hljs-keyword">this</span>.mb.extend({meta: meta}, <span class="hljs-keyword">this</span>.mb.coerce(message))
           )
         );
-      }.bind(<span class="hljs-keyword">this</span>)).catch(<span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
-        <span class="hljs-keyword">var</span> reason = error <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Error</span> ? error.toString() : error;
+      }.bind(<span class="hljs-keyword">this</span>));
+
+      <span class="hljs-keyword">var</span> errorHandler = <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error)</span> </span>{
+        <span class="hljs-keyword">var</span> reason = _.isError(error) ? error.toString() : error;
         <span class="hljs-keyword">var</span> errorMeta = _.extend({reason: reason}, meta);
 
+        <span class="hljs-keyword">if</span> (newrelic !== <span class="hljs-literal">null</span>) {
+          newrelic.noticeError(
+            _.isError(error) ? error : (<span class="hljs-string">''</span> + error),
+            message.toJSON()
+          );
+        }
+
         <span class="hljs-keyword">return</span> sendToAll(<span class="hljs-keyword">this</span>.mb.failure({meta: errorMeta}));
-      }.bind(<span class="hljs-keyword">this</span>));
-    }.bind(<span class="hljs-keyword">this</span>));
+      }.bind(<span class="hljs-keyword">this</span>);
+
+      <span class="hljs-keyword">if</span> (newrelic !== <span class="hljs-literal">null</span>) {
+        errorHandler = newrelic.agent.tracer.bindFunction(
+          errorHandler,
+          newrelic.agent.tracer.segment
+        );
+      }
+
+      execute = execute.catch(errorHandler);
+
+      <span class="hljs-keyword">if</span> (newrelic !== <span class="hljs-literal">null</span>) {
+        execute.finally(newrelic.agent.tracer.bindFunction(
+          newrelic.endTransaction.bind(newrelic),
+          newrelic.agent.tracer.segment
+        ));
+      }
+    }.bind(<span class="hljs-keyword">this</span>);
+
+    <span class="hljs-keyword">if</span> (newrelic !== <span class="hljs-literal">null</span>) {
+      messageHandler = newrelic.createBackgroundTransaction(
+        group,
+        messageHandler
+      );
+    }
+
+    <span class="hljs-keyword">this</span>.on(<span class="hljs-string">'group.'</span> + group, messageHandler);
   };</pre></div></div>
             
         </li>
