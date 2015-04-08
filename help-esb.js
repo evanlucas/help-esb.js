@@ -50,6 +50,12 @@
   //       // Process message
   //       return result;
   //     });
+  //
+  // Supported options:
+  // * `debug`: This logs messages to the console.
+  // * `newrelic`: This option can be set as an instance of the newrelic agent.
+  //   RPC requests received by this client will be wrapped in a newrelic
+  //   transaction named after the group.
   HelpEsb.Client = function(uri, options) {
     // Extend EventEmitter to handle events.
     EventEmitter.call(this);
@@ -60,7 +66,7 @@
     this._authentication = null;
     this._subscriptions = {};
     this._login = null;
-    this._options = _.extend({debug: false}, options);
+    this._options = _.extend({debug: false, newrelic: null}, options);
 
     this.mb = new HelpEsb.MessageBuilder(this);
   };
@@ -173,8 +179,9 @@
   //       throw new Error('Not implemented!');
   //     });
   HelpEsb.Client.prototype.rpcReceive = function(group, cb) {
+    var newrelic = this._options.newrelic;
     this.subscribe(group);
-    this.on('group.' + group, function(message) {
+    var messageHandler = function(message) {
       var meta = {
         type: 'sendMessage',
         replyTo: message.getMeta('id'),
@@ -202,19 +209,53 @@
         return Promise.all(groups.map(_.partial(sendToGroup, message)));
       };
 
-      Promise.try(cb.bind({}, message)).then(function(message) {
+      var execute = Promise.try(cb.bind({}, message)).then(function(message) {
         return sendToAll(
           this.mb.success(
             this.mb.extend({meta: meta}, this.mb.coerce(message))
           )
         );
-      }.bind(this)).catch(function(error) {
-        var reason = error instanceof Error ? error.toString() : error;
+      }.bind(this));
+
+      var errorHandler = function(error) {
+        var reason = _.isError(error) ? error.toString() : error;
         var errorMeta = _.extend({reason: reason}, meta);
 
+        if (newrelic !== null) {
+          newrelic.noticeError(
+            _.isError(error) ? error : ('' + error),
+            message.toJSON()
+          );
+        }
+
         return sendToAll(this.mb.failure({meta: errorMeta}));
-      }.bind(this));
-    }.bind(this));
+      }.bind(this);
+
+      if (newrelic !== null) {
+        errorHandler = newrelic.agent.tracer.bindFunction(
+          errorHandler,
+          newrelic.agent.tracer.segment
+        );
+      }
+
+      execute = execute.catch(errorHandler);
+
+      if (newrelic !== null) {
+        execute.finally(newrelic.agent.tracer.bindFunction(
+          newrelic.endTransaction.bind(newrelic),
+          newrelic.agent.tracer.segment
+        ));
+      }
+    }.bind(this);
+
+    if (newrelic !== null) {
+      messageHandler = newrelic.createBackgroundTransaction(
+        group,
+        messageHandler
+      );
+    }
+
+    this.on('group.' + group, messageHandler);
   };
 
   // ### HelpEsb.Client.close
