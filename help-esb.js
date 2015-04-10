@@ -347,6 +347,10 @@
   // Format the message for the ESB and send it over the socket.  JSON encodes
   // the message and appends a newline as the delimiter between messages.
   HelpEsb.Client.prototype._send = function(message, replyCallback) {
+    if (this._options.debug && !this._isInternal(message)) {
+      console.log('help-esb SENDING', message.toJSON());
+    }
+
     // Register a callback for replies to this message if a callback is given.
     if (replyCallback) {
       this.once(
@@ -379,10 +383,6 @@
   // Wait on the socket connection and once it is avaialable send the given
   // string packet returning a promise of the packet being sent.
   HelpEsb.Client.prototype._sendRaw = function(packet) {
-    if (this._options.debug) {
-      console.log('help-esb SENDING', packet);
-    }
-
     return this._socketConnection.then(function() {
       return this._socket.writeAsync(packet);
     }.bind(this));
@@ -419,10 +419,6 @@
   // packets like heartbeats, etc. that are kept separate from the primary
   // payload packets.
   HelpEsb.Client.prototype._handlePacket = function(packet) {
-    if (this._options.debug) {
-      console.log('help-esb RECEIVED', packet);
-    }
-
     var message;
 
     try {
@@ -431,8 +427,16 @@
         throw new Error('Invalid format detected for packet');
       }
     } catch (e) {
+      if (this._options.debug) {
+        console.log('help-esb ERROR PARSING', packet);
+      }
+
       this.emit('type.error', e);
       return;
+    }
+
+    if (this._options.debug && !this._isInternal(message)) {
+      console.log('help-esb RECEIVED', message.toJSON());
     }
 
     // Emits key.value events with the message.  If the value is an
@@ -452,6 +456,16 @@
     if (!_.any(_.map(message.getMeta(), emitKeyValue))) {
       this.emit('*.unhandled', message);
     }
+  };
+
+  // Check whether the message is one that is typically internal to the ESB
+  // client.  Heartbeats are internal as they are automatically responded to
+  // and don't need to clutter logs.
+  HelpEsb.Client.prototype._isInternal = function(message) {
+    return _.contains(
+      ['heartbeat', 'heartbeat-reply'],
+      message.getMeta('type')
+    );
   };
 
   // Registers a handler for heartbeats that responds to them to keep this
