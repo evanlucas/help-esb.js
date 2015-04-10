@@ -69,6 +69,8 @@
     this._options = _.extend({debug: false, newrelic: null}, options);
 
     this.mb = new HelpEsb.MessageBuilder(this);
+
+    this._registerHeartbeatResponder();
   };
 
   util.inherits(HelpEsb.Client, EventEmitter);
@@ -452,6 +454,14 @@
     }
   };
 
+  // Registers a handler for heartbeats that responds to them to keep this
+  // service alive.
+  HelpEsb.Client.prototype._registerHeartbeatResponder = function() {
+    this.on('type.heartbeat', function(message) {
+      this._send(this.mb.heartbeatReply(message));
+    }.bind(this));
+  };
+
   // This will return a failed promise if authentication hasn't been attempted
   // yet.
   HelpEsb.Client.prototype._authPromise = function() {
@@ -483,6 +493,15 @@
   // Creates a standard subscribe message for the given group name.
   HelpEsb.MessageBuilder.prototype.subscribe = function(group) {
     return this.create({meta: {type: 'subscribe'}, data: {channel: group}});
+  };
+
+  // ### HelpEsb.MessageBuilder.heartbeatReply
+  // Creates a standard heartbeat reply message for the given heartbeat
+  // message.
+  HelpEsb.MessageBuilder.prototype.heartbeatReply = function(heartbeat) {
+    return this.create({
+      meta: {type: 'heartbeat-reply', replyTo: heartbeat.getMeta('id')}
+    });
   };
 
   // ### HelpEsb.MessageBuilder.send
