@@ -203,13 +203,9 @@
         meta.session = message.getMeta('session');
       }
 
-      var sendToGroup = function(message, group) {
-        return this._send(this.mb.send(group, message));
-      }.bind(this);
-
       var sendToAll = function(message) {
-        return Promise.all(groups.map(_.partial(sendToGroup, message)));
-      };
+        return this._send(this.mb.send(groups, message));
+      }.bind(this);
 
       var execute = Promise.try(cb.bind({}, message)).then(function(message) {
         return sendToAll(
