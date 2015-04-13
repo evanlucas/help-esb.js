@@ -184,44 +184,16 @@
     var newrelic = this._options.newrelic;
     this.subscribe(group);
     var messageHandler = function(message) {
-      var meta = {
-        type: 'sendMessage',
-        replyTo: message.getMeta('id'),
-        channel: message.getMeta('from'),
-        inre: message.getMeta('id')
-      };
-
-      // Link up our reply to the incoming request but on the "result" group.
-      var groups = [group + '-result'];
-
-      // CC the groups in the incoming messages CC list.
-      if (message.hasMeta('cc.group')) {
-        groups = groups.concat(message.getMeta('cc.group'));
-      }
-
-      if (message.hasMeta('session')) {
-        meta.session = message.getMeta('session');
-      }
-
-      var sendToGroup = function(message, group) {
-        return this._send(this.mb.send(group, message));
-      }.bind(this);
-
-      var sendToAll = function(message) {
-        return Promise.all(groups.map(_.partial(sendToGroup, message)));
-      };
-
-      var execute = Promise.try(cb.bind({}, message)).then(function(message) {
-        return sendToAll(
+      var execute = Promise.try(cb.bind({}, message)).then(function(result) {
+        return this._send(
           this.mb.success(
-            this.mb.extend({meta: meta}, this.mb.coerce(message))
+            this.mb.extend(this.mb.rpcReply(message), this.mb.coerce(result))
           )
         );
       }.bind(this));
 
       var errorHandler = function(error) {
-        var reason = _.isError(error) ? error.toString() : error;
-        var errorMeta = _.extend({reason: reason}, meta);
+        var errorMeta = {reason: _.isError(error) ? error.toString() : error};
 
         if (newrelic !== null) {
           newrelic.noticeError(
@@ -230,7 +202,11 @@
           );
         }
 
-        return sendToAll(this.mb.failure({meta: errorMeta}));
+        return this._send(
+          this.mb.failure(
+            this.mb.extend(this.mb.rpcReply(message), {meta: errorMeta})
+          )
+        );
       }.bind(this);
 
       if (newrelic !== null) {
@@ -532,6 +508,27 @@
       },
       message
     );
+  };
+
+  // ### HelpEsb.MessageBuilder.rpcReply
+  // Wraps a standard send message based on an incoming RPC request message.
+  // Sets the replyTo, channel, group, and session meta fields.
+  HelpEsb.MessageBuilder.prototype.rpcReply = function(inre) {
+    var meta = {replyTo: inre.getMeta('id'), channel: inre.getMeta('from')};
+
+    // Link up our reply to the incoming request but on the "result" group.
+    var groups = [inre.getMeta('group') + '-result'];
+
+    // CC the groups in the incoming messages CC list.
+    if (inre.hasMeta('cc.group')) {
+      groups = groups.concat(inre.getMeta('cc.group'));
+    }
+
+    if (inre.hasMeta('session')) {
+      meta.session = inre.getMeta('session');
+    }
+
+    return this.send(groups, {meta: meta}, inre);
   };
 
   // ### HelpEsb.MessageBuilder.success
