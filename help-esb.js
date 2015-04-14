@@ -193,7 +193,7 @@
       }.bind(this));
 
       var errorHandler = function(error) {
-        var errorMeta = {reason: _.isError(error) ? error.toString() : error};
+        var errorMeta = {reason: _.isError(error) ? error.stack : error};
 
         if (newrelic !== null) {
           newrelic.noticeError(
